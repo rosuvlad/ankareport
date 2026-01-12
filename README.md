@@ -390,7 +390,8 @@ Available when `context.temporal` is provided in data:
 
 | Function | Description | Example |
 |----------|-------------|---------|
-| `localize(key)` | Get localized string | `localize('report_title')` |
+| `localize(key, [default], [locale], [res])` | Get localized string. Optional: default text, locale code, resources object. | `localize('title', 'Report', 'en-US')` |
+| `convertTz(date, toTz, [fromTz])` | Convert timezone. `toTz` is target IANA zone. `fromTz` is optional source zone. | `convertTz(date, 'America/New_York')` |
 | `sum(array)` | Sum array values | `sum(items.map(i => i.amount))` |
 | `avg(array)` | Average array values | `avg(scores)` |
 | `count(array)` | Count array items | `count(items)` |

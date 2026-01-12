@@ -57,15 +57,85 @@ export default class ElementsTreeList extends TreeList<ElementsTreeItemData> {
   }
 
   getDataSource() {
-    const s1 = this.options.reportContainer.report.reportSectionHeader;
-    const s2 = this.options.reportContainer.report.reportSectionContent;
-    const s3 = this.options.reportContainer.report.reportSectionFooter;
+    const sHeader = this.options.reportContainer.report.reportSectionHeader;
+    const sPageHeader = this.options.reportContainer.report.reportSectionPageHeader;
+    const sContent = this.options.reportContainer.report.reportSectionContent;
+    const sPageFooter = this.options.reportContainer.report.reportSectionPageFooter;
+    const sFooter = this.options.reportContainer.report.reportSectionFooter;
 
-    return [
-      this.getSectionData(s1, "Header"),
-      this.getSectionData(s2, "Content"),
-      this.getSectionData(s3, "Footer"),
-    ];
+    // Build tree with subsections shown in correct positions
+    const result: TreeItemData<ElementsTreeItemData>[] = [];
+    
+    // Header (without subsections nested - they're shown below)
+    result.push(this.getSectionDataWithoutSubsections(sHeader, "Header"));
+    
+    // Header subsections (between Header and Page Header)
+    for (const subsection of sHeader.subsections) {
+      result.push(this.getSectionData(subsection, `Header Section [${subsection.properties.binding || ""}]`));
+    }
+    
+    // Page Header
+    result.push(this.getSectionData(sPageHeader, "Page Header"));
+    
+    // Content (with its subsections nested inside)
+    result.push(this.getSectionData(sContent, "Content"));
+    
+    // Page Footer
+    result.push(this.getSectionData(sPageFooter, "Page Footer"));
+    
+    // Footer subsections (between Page Footer and Footer)
+    for (const subsection of sFooter.subsections) {
+      result.push(this.getSectionData(subsection, `Footer Section [${subsection.properties.binding || ""}]`));
+    }
+    
+    // Footer (without subsections nested - they're shown above)
+    result.push(this.getSectionDataWithoutSubsections(sFooter, "Footer"));
+    
+    return result;
+  }
+  
+  getSectionDataWithoutSubsections(
+    section: ReportSection,
+    label?: string,
+  ): TreeItemData<ElementsTreeItemData> {
+    return {
+      label: label || `Section [${section.properties.binding}]`,
+      data: {
+        type: "section",
+        component: section,
+      },
+      children: [
+        ...section.items.map((x) => {
+          if (x instanceof TextReportItem) {
+            const textReportItem: TextReportItem = x;
+
+            const item: TreeItemData<ElementsTreeItemData> = {
+              label: `Text [${
+                textReportItem.properties.binding ||
+                textReportItem.properties.text ||
+                ""
+              }]`,
+              data: {
+                type: "item",
+                component: x,
+              },
+            };
+            return item;
+          }
+
+          const item: TreeItemData<ElementsTreeItemData> = {
+            label: `Image`,
+            data: {
+              type: "item",
+              component: x,
+            },
+          };
+
+          return item;
+        }),
+        // No subsections here - they're shown at top level
+      ],
+    };
   }
 
   getSectionData(

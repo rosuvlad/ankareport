@@ -1,10 +1,12 @@
 import ContextMenu from "../../components/contextMenu/contextMenu";
 import { MenuButton } from "../../components/menu/menu";
 import EventEmitter, { EventCallback } from "../../core/eventEmitter";
-import { IBarcodeReportItem, ISection, ITextReportItem, IImageReportItem } from "../../core/layout";
+import { IBarcodeReportItem, IQRCodeReportItem, ISection, ITextReportItem, IImageReportItem, IChartReportItem } from "../../core/layout";
 import {
   BarcodeReportItem,
+  ChartReportItem,
   ImageReportItem,
+  QRCodeReportItem,
   ReportItem,
   TextReportItem,
 } from "../../core/reportItems";
@@ -51,7 +53,8 @@ export default class ReportSection {
   public readonly resizer = new Resizer({
     orientation: ResizerOrientation.Horizontal,
     onResize: (e) => {
-      this.properties.height = this.properties.height + e.offsetY;
+      const currentHeight = this.properties.height === "auto" ? 100 : this.properties.height;
+      this.properties.height = currentHeight + e.offsetY;
     },
   });
 
@@ -202,7 +205,9 @@ export default class ReportSection {
 
   refresh() {
     this.elementHeader.innerText = this._getHeaderText();
-    this.elementContent.style.height = `${this.properties.height}px`;
+    // Use default visual height of 100px in designer when height is 'auto'
+    const visualHeight = this.properties.height === "auto" ? 100 : this.properties.height;
+    this.elementContent.style.height = `${visualHeight}px`;
   }
 
   addEventListener<K extends keyof ReportSectionEventMap>(
@@ -271,6 +276,50 @@ export default class ReportSection {
 
   createBarcodeItem(defaultProperties: Partial<IBarcodeReportItem>) {
     const item = new BarcodeReportItem({
+      parentStyles: this.styles.getList(),
+      defaultProperties,
+      appendTo: this.elementContent,
+    });
+
+    item.addEventListener("change", (e) => {
+      this._onChange({ type: "change-item", item, changes: e.changes });
+    });
+    item.addEventListener("focus", () => {
+      this.selectItem([item]);
+      this.elementContent.scrollTop = 0;
+      this.elementContent.scrollLeft = 0;
+    });
+    this.items.push(item);
+
+    this._onChange({ type: "add-item", item });
+
+    return item;
+  }
+
+  createQRCodeItem(defaultProperties: Partial<IQRCodeReportItem>) {
+    const item = new QRCodeReportItem({
+      parentStyles: this.styles.getList(),
+      defaultProperties,
+      appendTo: this.elementContent,
+    });
+
+    item.addEventListener("change", (e) => {
+      this._onChange({ type: "change-item", item, changes: e.changes });
+    });
+    item.addEventListener("focus", () => {
+      this.selectItem([item]);
+      this.elementContent.scrollTop = 0;
+      this.elementContent.scrollLeft = 0;
+    });
+    this.items.push(item);
+
+    this._onChange({ type: "add-item", item });
+
+    return item;
+  }
+
+  createChartItem(defaultProperties: Partial<IChartReportItem>) {
+    const item = new ChartReportItem({
       parentStyles: this.styles.getList(),
       defaultProperties,
       appendTo: this.elementContent,
@@ -360,6 +409,7 @@ export default class ReportSection {
   loadLayout(layout: Partial<ISection>) {
     if (layout.height) this.properties.height = layout.height;
     if (layout.binding) this.properties.binding = layout.binding;
+    if (layout.groupBy) this.properties.groupBy = layout.groupBy;
 
     layout.items?.forEach((data) => {
       if (!data.type || data.type === "text") {
@@ -368,6 +418,10 @@ export default class ReportSection {
         this.createImageItem({ ...data, type: "image" });
       } else if (data.type === "barcode") {
         this.createBarcodeItem({ ...data, type: "barcode" });
+      } else if (data.type === "qrcode") {
+        this.createQRCodeItem({ ...data, type: "qrcode" });
+      } else if (data.type === "chart") {
+        this.createChartItem({ ...data, type: "chart" });
       }
     });
 
@@ -385,6 +439,7 @@ export default class ReportSection {
     this.properties.fontFamily = layout.fontFamily;
     this.properties.fontSize = layout.fontSize;
     this.properties.fontWeight = layout.fontWeight;
+    if (layout.keepTogether !== undefined) this.properties.keepTogether = layout.keepTogether;
     this.properties.endUpdate();
 
     this.refresh();
@@ -394,6 +449,8 @@ export default class ReportSection {
     return {
       height: this.properties.height,
       binding: this.properties.binding,
+      groupBy: this.properties.groupBy || undefined,
+      keepTogether: this.properties.keepTogether || undefined,
       items: this.items.map((x) => x.toJSON()),
       sections: this.subsections.map((x) => x.toJSON()),
       color: this.properties.color,
@@ -463,6 +520,27 @@ export default class ReportSection {
         y: e.offsetY,
         width: 50,
         height: 50,
+      });
+
+      this.selectItem([item]);
+    } else if (type === "qrcode") {
+      const item = this.createQRCodeItem({
+        value: "",
+        binding: field,
+        x: e.offsetX,
+        y: e.offsetY,
+        width: 80,
+        height: 80,
+      });
+
+      this.selectItem([item]);
+    } else if (type === "chart") {
+      const item = this.createChartItem({
+        chartType: "bar",
+        x: e.offsetX,
+        y: e.offsetY,
+        width: 300,
+        height: 200,
       });
 
       this.selectItem([item]);

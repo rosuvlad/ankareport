@@ -2,11 +2,12 @@ import DropdownList from "../../components/propertyGrid/editors/dropdownList";
 import { Property } from "../../components/propertyGrid/property";
 import BaseReportItemProperties from "./baseReportItemProperties";
 
-export default class ImageReportItemProperties extends BaseReportItemProperties {
+export default class BarcodeReportItemProperties extends BaseReportItemProperties {
   private _value = "";
   private _binding = "";
   private _format = "";
   private _barWidth: 1 | 2 | 3 | 4 = 1;
+  private _displayValue: boolean = false;
 
   get value() {
     return this._value;
@@ -19,6 +20,9 @@ export default class ImageReportItemProperties extends BaseReportItemProperties 
   }
   get barWidth() {
     return this._barWidth;
+  }
+  get displayValue() {
+    return this._displayValue;
   }
 
   set value(value: string) {
@@ -41,6 +45,16 @@ export default class ImageReportItemProperties extends BaseReportItemProperties 
     this._barWidth = value;
     this.emitOnChange("barWidth", value, oldValue);
   }
+  set displayValue(value: boolean | string) {
+    const oldValue = this.displayValue;
+    // Parse string to boolean
+    if (typeof value === 'string') {
+      this._displayValue = value.toLowerCase() === 'true';
+    } else {
+      this._displayValue = value;
+    }
+    this.emitOnChange("displayValue", this._displayValue, oldValue);
+  }
 
   getPropertyDefinitions(): Property[] {
     return [
@@ -48,9 +62,20 @@ export default class ImageReportItemProperties extends BaseReportItemProperties 
       { field: "binding", label: "Binding", type: "string" },
       { field: "format", label: "Format", type: "string", editor: createFormatEditor() },
       { field: "barWidth", label: "Bar Width", type: "number", editor: createBarWidthEditor() },
+      { field: "displayValue", label: "Show Label", type: "string", editor: createBooleanEditor() },
       ...super.getPropertyDefinitions(),
     ];
   }
+}
+
+function createBooleanEditor() {
+  return new DropdownList({
+    defaultValue: "false",
+    items: [
+      { value: "false", label: "False" },
+      { value: "true", label: "True" },
+    ],
+  });
 }
 
 function createFormatEditor() {

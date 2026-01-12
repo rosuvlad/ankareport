@@ -127,6 +127,7 @@ export default abstract class BaseReportItem implements IDisposable {
     this.properties.width = layout.width ?? 0;
     this.properties.height = layout.height ?? 0;
     this.properties.name = layout.name ?? "";
+    this.properties.visible = layout.visible ?? "";
     this.properties.color = layout.color;
     this.properties.backgroundColor = layout.backgroundColor;
     this.properties.textAlign = layout.textAlign as TextAlign;
@@ -136,6 +137,7 @@ export default abstract class BaseReportItem implements IDisposable {
     this.properties.fontFamily = layout.fontFamily;
     this.properties.fontSize = layout.fontSize;
     this.properties.fontWeight = layout.fontWeight;
+    this.properties.conditionalStyles = layout.conditionalStyles ?? [];
   }
 
   toJSON(): IBaseReportItem {
@@ -145,6 +147,7 @@ export default abstract class BaseReportItem implements IDisposable {
       width: this.properties.width,
       height: this.properties.height,
       name: this.properties.name,
+      visible: this.properties.visible || undefined,
       color: this.properties.color,
       backgroundColor: this.properties.backgroundColor,
       textAlign: this.properties.textAlign,
@@ -154,6 +157,7 @@ export default abstract class BaseReportItem implements IDisposable {
       fontFamily: this.properties.fontFamily,
       fontSize: this.properties.fontSize,
       fontWeight: this.properties.fontWeight,
+      conditionalStyles: (Array.isArray(this.properties.conditionalStyles) && this.properties.conditionalStyles.length) ? this.properties.conditionalStyles : undefined,
     };
   }
 

@@ -1,38 +1,335 @@
 import { ILayout, IReportItem, ISection } from "../layout";
+import { evaluateExpression, evaluateCondition, ExpressionContext } from "./expression";
 import { formatDate, formatNumber } from "./format";
 
-export function generateItems(layout: ILayout, data: any): IReportItem[] {
-  const items = [];
+export interface GenerateContext {
+  rootData: any;
+  pageNum?: number;
+  totalPages?: number;
+}
+
+export interface SectionGroup {
+  startY: number;
+  endY: number;
+  keepTogether: boolean;
+  sectionType: 'header' | 'content' | 'footer' | 'subsection';
+}
+
+export interface GenerateResult {
+  items: IReportItem[];
+  sectionGroups: SectionGroup[];
+}
+
+export function generateItemsWithSections(layout: ILayout, data: any, genContext?: GenerateContext): GenerateResult {
+  const items: IReportItem[] = [];
+  const sectionGroups: SectionGroup[] = [];
+  const rootData = genContext?.rootData ?? data;
 
   let topMargin = 0;
 
-  const headerElements = getSectionItems(topMargin, layout.headerSection, data);
+  // Header section
+  const headerData = resolveSectionData(layout.headerSection.binding, data);
+  const headerStartY = topMargin;
+  const headerElements = getSectionItems(topMargin, layout.headerSection, headerData, undefined, { rootData, ...genContext });
+  topMargin += headerElements.height;
+  items.push(...headerElements.items);
+  sectionGroups.push({
+    startY: headerStartY,
+    endY: topMargin,
+    keepTogether: false,
+    sectionType: 'header',
+  });
+
+  // Content section
+  if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
+    const contentArray = data[layout.contentSection.binding];
+    const keepTogether = layout.contentSection.keepTogether ?? false;
+    
+    if (layout.contentSection.groupBy) {
+      const groupedResult = processGroupedContentWithSections(topMargin, layout.contentSection, contentArray, { rootData, ...genContext });
+      topMargin += groupedResult.height;
+      items.push(...groupedResult.items);
+      sectionGroups.push(...groupedResult.sectionGroups);
+    } else {
+      for (let i = 0; i < contentArray.length; i++) {
+        const contentStartY = topMargin;
+        const contentElements = getSectionItems(topMargin, layout.contentSection, contentArray[i], i, { rootData, ...genContext });
+        topMargin += contentElements.height;
+        items.push(...contentElements.items);
+        sectionGroups.push({
+          startY: contentStartY,
+          endY: topMargin,
+          keepTogether,
+          sectionType: 'content',
+        });
+      }
+    }
+  } else {
+    const contentStartY = topMargin;
+    const contentElements = getSectionItems(topMargin, layout.contentSection, data, undefined, { rootData, ...genContext });
+    topMargin += contentElements.height;
+    items.push(...contentElements.items);
+    sectionGroups.push({
+      startY: contentStartY,
+      endY: topMargin,
+      keepTogether: layout.contentSection.keepTogether ?? false,
+      sectionType: 'content',
+    });
+  }
+
+  // Footer section
+  const footerData = resolveSectionData(layout.footerSection.binding, data);
+  const footerStartY = topMargin;
+  const footerElements = getSectionItems(topMargin, layout.footerSection, footerData, undefined, { rootData, ...genContext });
+  topMargin += footerElements.height;
+  items.push(...footerElements.items);
+  sectionGroups.push({
+    startY: footerStartY,
+    endY: topMargin,
+    keepTogether: false,
+    sectionType: 'footer',
+  });
+
+  return { items, sectionGroups };
+}
+
+function processGroupedContentWithSections(topMargin: number, section: ISection, dataArray: any[], sectionContext: SectionContext) {
+  const items: IReportItem[] = [];
+  const sectionGroups: SectionGroup[] = [];
+  let height = 0;
+  const groupBy = section.groupBy!;
+  const keepTogether = section.keepTogether ?? false;
+
+  const groups = new Map<any, any[]>();
+  for (const item of dataArray) {
+    const key = item[groupBy];
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(item);
+  }
+
+  let globalIndex = 0;
+
+  for (const [groupKey, groupData] of groups) {
+    const groupContext: SectionContext = {
+      rootData: sectionContext.rootData,
+      pageNum: sectionContext.pageNum,
+      totalPages: sectionContext.totalPages,
+      groupKey,
+      groupCount: groupData.length,
+      groupData,
+    };
+
+    if (section.groupHeader) {
+      const headerElements = getSectionItems(
+        topMargin + height,
+        section.groupHeader,
+        groupData[0],
+        undefined,
+        groupContext
+      );
+      height += headerElements.height;
+      items.push(...headerElements.items);
+    }
+
+    for (let i = 0; i < groupData.length; i++) {
+      const itemStartY = topMargin + height;
+      const itemElements = getSectionItems(
+        topMargin + height,
+        section,
+        groupData[i],
+        globalIndex,
+        groupContext
+      );
+      height += itemElements.height;
+      items.push(...itemElements.items);
+      sectionGroups.push({
+        startY: itemStartY,
+        endY: topMargin + height,
+        keepTogether,
+        sectionType: 'content',
+      });
+      globalIndex++;
+    }
+
+    if (section.groupFooter) {
+      const footerElements = getSectionItems(
+        topMargin + height,
+        section.groupFooter,
+        groupData[groupData.length - 1],
+        undefined,
+        groupContext
+      );
+      height += footerElements.height;
+      items.push(...footerElements.items);
+    }
+  }
+
+  return { height, items, sectionGroups };
+}
+
+export function generateItems(layout: ILayout, data: any, genContext?: GenerateContext): IReportItem[] {
+  const items: IReportItem[] = [];
+  const rootData = genContext?.rootData ?? data;
+
+  let topMargin = 0;
+
+  const headerData = resolveSectionData(layout.headerSection.binding, data);
+  const headerElements = getSectionItems(topMargin, layout.headerSection, headerData, undefined, { rootData, ...genContext });
   topMargin += headerElements.height;
   items.push(...headerElements.items);
 
   if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
-    for (const subData of data[layout.contentSection.binding]) {
-      const contentElements = getSectionItems(topMargin, layout.contentSection, subData);
-      topMargin += contentElements.height;
-      items.push(...contentElements.items);
+    const contentArray = data[layout.contentSection.binding];
+    
+    // Check if grouping is enabled
+    if (layout.contentSection.groupBy) {
+      const groupedResult = processGroupedContent(topMargin, layout.contentSection, contentArray, { rootData, ...genContext });
+      topMargin += groupedResult.height;
+      items.push(...groupedResult.items);
+    } else {
+      for (let i = 0; i < contentArray.length; i++) {
+        const contentElements = getSectionItems(topMargin, layout.contentSection, contentArray[i], i, { rootData, ...genContext });
+        topMargin += contentElements.height;
+        items.push(...contentElements.items);
+      }
     }
   } else {
-    const contentElements = getSectionItems(topMargin, layout.contentSection, data);
+    const contentElements = getSectionItems(topMargin, layout.contentSection, data, undefined, { rootData, ...genContext });
     topMargin += contentElements.height;
     items.push(...contentElements.items);
   }
 
-  const footerElements = getSectionItems(topMargin, layout.footerSection, data);
+  const footerData = resolveSectionData(layout.footerSection.binding, data);
+  const footerElements = getSectionItems(topMargin, layout.footerSection, footerData, undefined, { rootData, ...genContext });
   topMargin += footerElements.height;
   items.push(...footerElements.items);
 
   return items;
 }
 
-function getSectionItems(topMargin: number, section: ISection, data: any) {
-  let height = section.height;
+function processGroupedContent(topMargin: number, section: ISection, dataArray: any[], sectionContext: SectionContext) {
+  const items: IReportItem[] = [];
+  let height = 0;
+  const groupBy = section.groupBy!;
 
-  const items = section.items?.map(item => {
+  // Group data by the specified field
+  const groups = new Map<any, any[]>();
+  for (const item of dataArray) {
+    const key = item[groupBy];
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(item);
+  }
+
+  let globalIndex = 0;
+
+  // Process each group
+  for (const [groupKey, groupData] of groups) {
+    const groupContext: SectionContext = {
+      rootData: sectionContext.rootData,
+      pageNum: sectionContext.pageNum,
+      totalPages: sectionContext.totalPages,
+      groupKey,
+      groupCount: groupData.length,
+      groupData,
+    };
+
+    // Render group header if defined
+    if (section.groupHeader) {
+      const headerElements = getSectionItems(
+        topMargin + height,
+        section.groupHeader,
+        groupData[0], // Use first item for header context
+        undefined,
+        groupContext
+      );
+      height += headerElements.height;
+      items.push(...headerElements.items);
+    }
+
+    // Render group items
+    for (let i = 0; i < groupData.length; i++) {
+      const itemElements = getSectionItems(
+        topMargin + height,
+        section,
+        groupData[i],
+        globalIndex,
+        groupContext
+      );
+      height += itemElements.height;
+      items.push(...itemElements.items);
+      globalIndex++;
+    }
+
+    // Render group footer if defined
+    if (section.groupFooter) {
+      const footerElements = getSectionItems(
+        topMargin + height,
+        section.groupFooter,
+        groupData[groupData.length - 1], // Use last item for footer context
+        undefined,
+        groupContext
+      );
+      height += footerElements.height;
+      items.push(...footerElements.items);
+    }
+  }
+
+  return { height, items };
+}
+
+function resolveSectionData(binding: string, data: any): any {
+  if (!binding || !data) return data;
+  const context: ExpressionContext = { data };
+  const result = evaluateExpression(binding, context);
+  return result ?? data;
+}
+
+interface SectionContext {
+  rootData: any;
+  pageNum?: number;
+  totalPages?: number;
+  groupKey?: any;
+  groupCount?: number;
+  groupData?: any[];
+}
+
+function calculateAutoHeight(section: ISection): number {
+  let maxBottom = 0;
+  
+  // Use original section item positions (before topMargin is added)
+  for (const item of section.items || []) {
+    const itemBottom = (item.y || 0) + (item.height || 0);
+    if (itemBottom > maxBottom) {
+      maxBottom = itemBottom;
+    }
+  }
+  
+  return maxBottom + 10; // Add padding
+}
+
+function getSectionItems(topMargin: number, section: ISection, data: any, index?: number, sectionContext?: SectionContext) {
+  let height = section.height === "auto" ? 0 : section.height;
+
+  const context: ExpressionContext = {
+    data,
+    rootData: sectionContext?.rootData ?? data,
+    index,
+    pageNum: sectionContext?.pageNum,
+    totalPages: sectionContext?.totalPages,
+    groupKey: sectionContext?.groupKey,
+    groupCount: sectionContext?.groupCount,
+    groupData: sectionContext?.groupData,
+  };
+
+  const items: IReportItem[] = section.items?.filter(item => {
+    // Check visibility condition
+    if (!item.visible) return true;
+    return evaluateCondition(item.visible, context);
+  }).map(item => {
     var result = {
       ...item,
       x: item.x,
@@ -42,9 +339,9 @@ function getSectionItems(topMargin: number, section: ISection, data: any) {
     };
 
     if (result.type === "text" && result.binding) {
-      let bindedData = data ? data[result.binding] : "NULL";
+      let bindedData = evaluateExpression(result.binding, context) ?? "NULL";
 
-      if (result.format) {
+      if (result.format && typeof bindedData !== 'string') {
         if (typeof bindedData === "number") {
           bindedData = formatNumber(bindedData, result.format);
         } else if (new Date(bindedData).toString() !== "Invalid Date") {
@@ -52,7 +349,126 @@ function getSectionItems(topMargin: number, section: ISection, data: any) {
         }
       }
 
-      result.text = bindedData;
+      result.text = String(bindedData);
+    }
+
+    // Handle barcode binding
+    if (result.type === "barcode" && (result as any).binding) {
+      const bindedData = evaluateExpression((result as any).binding, context);
+      (result as any).value = String(bindedData ?? "");
+    }
+
+    // Handle qrcode binding
+    if (result.type === "qrcode" && (result as any).binding) {
+      const bindedData = evaluateExpression((result as any).binding, context);
+      (result as any).value = String(bindedData ?? "");
+    }
+
+    // Handle image binding
+    if (result.type === "image" && (result as any).binding) {
+      const bindedData = evaluateExpression((result as any).binding, context);
+      (result as any).source = String(bindedData ?? "");
+    }
+
+    // Handle chart bindings
+    if (result.type === "chart") {
+      const chartResult = result as any;
+      
+      // Resolve labels binding
+      if (chartResult.labelsBinding) {
+        const labels = evaluateExpression(chartResult.labelsBinding, context);
+        if (Array.isArray(labels)) {
+          chartResult.labels = labels.map((l: any) => String(l));
+        }
+      }
+      
+      // Resolve datasets binding
+      if (chartResult.datasetsBinding) {
+        const datasets = evaluateExpression(chartResult.datasetsBinding, context);
+        try { console.log(`[PDF-DEBUG-6] datasetsBinding result:`, typeof datasets, Array.isArray(datasets)); } catch(e) {}
+        if (Array.isArray(datasets)) {
+          // Process each dataset for label bindings
+          chartResult.datasets = datasets.map((ds: any) => {
+            const resolvedDs = { ...ds };
+            if (ds.labelBinding) {
+              resolvedDs.label = String(evaluateExpression(ds.labelBinding, context) ?? ds.label ?? "");
+            }
+            if (ds.dataBinding) {
+              const data = evaluateExpression(ds.dataBinding, context);
+              if (Array.isArray(data)) {
+                resolvedDs.data = data;
+              }
+            }
+            return resolvedDs;
+          });
+        }
+      }
+      
+      // Resolve title binding (supports LOCALIZE)
+      if (chartResult.titleBinding) {
+        chartResult.title = String(evaluateExpression(chartResult.titleBinding, context) ?? chartResult.title ?? "");
+      }
+      
+      // Resolve legend title binding
+      if (chartResult.legend?.titleBinding) {
+        chartResult.legend = {
+          ...chartResult.legend,
+          title: String(evaluateExpression(chartResult.legend.titleBinding, context) ?? chartResult.legend.title ?? ""),
+        };
+      }
+      
+      // Resolve axis title bindings
+      if (chartResult.scales?.x?.title?.textBinding) {
+        chartResult.scales = {
+          ...chartResult.scales,
+          x: {
+            ...chartResult.scales.x,
+            title: {
+              ...chartResult.scales.x.title,
+              text: String(evaluateExpression(chartResult.scales.x.title.textBinding, context) ?? chartResult.scales.x.title.text ?? ""),
+            },
+          },
+        };
+      }
+      if (chartResult.scales?.y?.title?.textBinding) {
+        chartResult.scales = {
+          ...chartResult.scales,
+          y: {
+            ...chartResult.scales.y,
+            title: {
+              ...chartResult.scales.y.title,
+              text: String(evaluateExpression(chartResult.scales.y.title.textBinding, context) ?? chartResult.scales.y.title.text ?? ""),
+            },
+          },
+        };
+      }
+      
+      // Resolve axis min/max bindings
+      if (chartResult.scales?.y?.minBinding) {
+        const min = evaluateExpression(chartResult.scales.y.minBinding, context);
+        if (typeof min === 'number') {
+          chartResult.scales.y.min = min;
+        }
+      }
+      if (chartResult.scales?.y?.maxBinding) {
+        const max = evaluateExpression(chartResult.scales.y.maxBinding, context);
+        if (typeof max === 'number') {
+          chartResult.scales.y.max = max;
+        }
+      }
+    }
+
+    // Apply conditional styles
+    if (item.conditionalStyles) {
+      for (const cs of item.conditionalStyles) {
+        if (evaluateCondition(cs.condition, context)) {
+          if (cs.color) result.color = cs.color;
+          if (cs.backgroundColor) result.backgroundColor = cs.backgroundColor;
+          if (cs.fontWeight) result.fontWeight = cs.fontWeight;
+          if (cs.fontSize) result.fontSize = cs.fontSize;
+          if (cs.borderColor) result.borderColor = cs.borderColor;
+        }
+      }
     }
 
     if (!result.color) result.color = "#000000";
@@ -62,17 +478,22 @@ function getSectionItems(topMargin: number, section: ISection, data: any) {
     return result;
   }) ?? [];
 
+  // Calculate auto height from items before processing subsections
+  if (section.height === "auto") {
+    height = calculateAutoHeight(section);
+  }
+
   if (section.sections) {
     for (const subSection of section.sections) {
       const subData = subSection.binding && data ? data[subSection.binding] : null;
       if (Array.isArray(subData)) {
-        for (const subDataObj of subData) {
-          const subItems = getSectionItems(topMargin + height, subSection, subDataObj);
+        for (let i = 0; i < subData.length; i++) {
+          const subItems = getSectionItems(topMargin + height, subSection, subData[i], i, sectionContext);
           height += subItems.height;
           items.push(...subItems.items);
         }
       } else {
-        const subItems = getSectionItems(topMargin + height, subSection, subData);
+        const subItems = getSectionItems(topMargin + height, subSection, subData, undefined, sectionContext);
         height += subItems.height;
         items.push(...subItems.items);
       }

@@ -1,8 +1,10 @@
 import { saveAs } from "file-saver";
-import { ILayout } from "../core/layout";
+import { ILayout, ISection } from "../core/layout";
 import { exportToXlsx } from "../exports/excel-exporter";
 import Section from "./section";
 import { exportToPdf } from "../export/export-to-pdf";
+import { resolvePageDimensions } from "../core/utils/pageSize";
+import { evaluateExpression } from "../core/utils/expression";
 
 export interface RendererOptions {
   element: HTMLDivElement;
@@ -13,44 +15,134 @@ export interface RendererOptions {
 export default class Renderer {
   private readonly headerSection: Section;
   private readonly footerSection: Section;
+  private readonly pageWidth: number;
+  private readonly pageHeight: number;
 
   constructor(private readonly options: RendererOptions) {
     if (!options.data) throw "Data is required";
     if (Array.isArray(options.data)) throw "Data must be an object";
 
+    const rootData = this.options.data;
+    
+    // Resolve page dimensions
+    const { width, height } = resolvePageDimensions(
+      this.options.layout.pageSize,
+      this.options.layout.width,
+      this.options.layout.height
+    );
+    this.pageWidth = width;
+    this.pageHeight = height;
+
+    // Setup container
+    this.options.element.style.width = width + "px";
+    this.options.element.style.position = "relative";
+    this.options.element.style.margin = "0 auto";
+    this.options.element.style.backgroundColor = this.options.layout.backgroundColor || "#ffffff";
+
+    // Render page header (shown at top, emulating PDF behavior)
+    if (this.options.layout.pageHeaderSection) {
+      const pageHeaderSection = this.createPageSection(
+        this.options.layout.pageHeaderSection,
+        rootData,
+        1, // Page 1 for preview
+        1  // Total pages (estimate)
+      );
+      pageHeaderSection.element.style.borderBottom = "1px dashed #ccc";
+      pageHeaderSection.element.setAttribute("data-section-type", "page-header");
+      this.options.element.appendChild(pageHeaderSection.element);
+    }
+
+    // Render header section
+    const headerData = this.resolveSectionData(this.options.layout.headerSection.binding, rootData);
     this.headerSection = new Section(
       this.options.layout.headerSection,
-      this.options.data,
+      headerData,
       [this.options.layout],
+      undefined,
+      { rootData },
     );
-    this.footerSection = new Section(
-      this.options.layout.footerSection,
-      this.options.data,
-      [this.options.layout],
-    );
-
-    this.options.element.style.width = this.options.layout.width + "px";
-    this.options.element.style.position = "relative";
-
     this.options.element.appendChild(this.headerSection.element);
 
+    // Render content sections
     const contentProperty = this.options.layout.contentSection.binding;
+    const contentData = contentProperty ? this.options.data[contentProperty] : null;
 
-    this.options.data[contentProperty].forEach((data: any) => {
+    if (Array.isArray(contentData)) {
+      contentData.forEach((data: any, index: number) => {
+        const contentSection = new Section(
+          this.options.layout.contentSection,
+          data,
+          [this.options.layout],
+          index,
+          { rootData },
+        );
+        this.options.element.appendChild(contentSection.element);
+        this.options.element.appendChild(contentSection.elementSections);
+      });
+    } else if (contentData) {
       const contentSection = new Section(
         this.options.layout.contentSection,
-        data,
+        contentData,
         [this.options.layout],
+        0,
+        { rootData },
       );
       this.options.element.appendChild(contentSection.element);
       this.options.element.appendChild(contentSection.elementSections);
-    });
+    }
 
+    // Render footer section
+    const footerData = this.resolveSectionData(this.options.layout.footerSection.binding, rootData);
+    this.footerSection = new Section(
+      this.options.layout.footerSection,
+      footerData,
+      [this.options.layout],
+      undefined,
+      { rootData },
+    );
     this.options.element.appendChild(this.footerSection.element);
+
+    // Render page footer (shown at bottom, emulating PDF behavior)
+    if (this.options.layout.pageFooterSection) {
+      const pageFooterSection = this.createPageSection(
+        this.options.layout.pageFooterSection,
+        rootData,
+        1,
+        1
+      );
+      pageFooterSection.element.style.borderTop = "1px dashed #ccc";
+      pageFooterSection.element.setAttribute("data-section-type", "page-footer");
+      this.options.element.appendChild(pageFooterSection.element);
+    }
+  }
+
+  private createPageSection(
+    sectionLayout: ISection,
+    rootData: any,
+    pageNum: number,
+    totalPages: number
+  ): Section {
+    // Create a modified section with page variables resolved
+    const modifiedLayout = { ...sectionLayout };
+    
+    // Create section with page context
+    const section = new Section(
+      modifiedLayout,
+      rootData,
+      [this.options.layout],
+      undefined,
+      { 
+        rootData,
+        pageNum,
+        totalPages,
+      },
+    );
+    
+    return section;
   }
 
   public async exportToXlsx(filename: string) {
-    const workbook = exportToXlsx(this.options.layout, this.options.data);
+    const workbook = await exportToXlsx(this.options.layout, this.options.data);
 
     const data = await workbook.xlsx.writeBuffer();
 
@@ -59,12 +151,48 @@ export default class Renderer {
     saveAs(blob, filename);
   }
 
+  private resolveSectionData(binding: string, data: any): any {
+    if (!binding || !data) return data;
+    return this.resolvePath(binding, data) ?? data;
+  }
+
+  private resolvePath(path: string, data: any): any {
+    if (!data || !path) return null;
+
+    const segments: (string | number)[] = [];
+    const regex = /([^.\[\]]+)|\[(\d+)\]/g;
+    let match;
+
+    while ((match = regex.exec(path)) !== null) {
+      if (match[1] !== undefined) {
+        // Convert numeric strings to numbers for array access
+        const segment = match[1];
+        segments.push(/^\d+$/.test(segment) ? parseInt(segment, 10) : segment);
+      } else if (match[2] !== undefined) {
+        segments.push(parseInt(match[2], 10));
+      }
+    }
+
+    let result = data;
+    for (const segment of segments) {
+      if (result == null) return null;
+      result = result[segment];
+    }
+
+    return result;
+  }
+
   async exportToPdf(fileName: string) {
-    const bytes = await exportToPdf(this.options.layout, this.options.data);
-    const blob = new Blob([bytes], { type: "application/pdf" });
-    const link = document.createElement("a");
-    link.href = window.URL.createObjectURL(blob);
-    link.download = fileName;
-    link.click();
+    try {
+      const bytes = await exportToPdf(this.options.layout, this.options.data);
+      const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+    } catch (e) {
+      console.error("Error in exportToPdf:", e);
+      throw e;
+    }
   }
 }

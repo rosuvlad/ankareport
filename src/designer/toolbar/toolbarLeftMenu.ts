@@ -27,5 +27,19 @@ export default class ToolbarLeftMenu extends Toolbar {
       draggable: true,
       type: "barcode",
     });
+
+    this.labelButton = this.addButton({
+      text: "Q",
+      title: "QR Code",
+      draggable: true,
+      type: "qrcode",
+    });
+
+    this.labelButton = this.addButton({
+      text: "C",
+      title: "Chart",
+      draggable: true,
+      type: "chart",
+    });
   }
 }

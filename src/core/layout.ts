@@ -11,8 +11,7 @@ export interface ILayout extends IStyle {
   footerSection: ISection;
   pageHeaderSection?: ISection;
   pageFooterSection?: ISection;
-  pageHeaderVisibleOnFirstPage?: boolean; // Default: false
-  pageFooterVisibleOnFirstPage?: boolean; // Default: false
+  initialPageNumber?: number; // Default: 0
 }
 
 export interface ISection extends IStyle {
@@ -24,6 +23,8 @@ export interface ISection extends IStyle {
   groupHeader?: ISection;
   groupFooter?: ISection;
   keepTogether?: boolean;
+  visibleOnFirstPage?: boolean;
+  visibleOnLastPage?: boolean;
 }
 
 export interface IConditionalStyle extends IStyle {

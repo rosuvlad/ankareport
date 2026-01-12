@@ -144,8 +144,12 @@ export default class ReportSection {
 
         const dataSourceItem = sectionDataSource.find((x) => x.field === field);
 
-        // TODO: Possible null value here
-        sectionDataSource = dataSourceItem?.children!;
+        if (!dataSourceItem || !dataSourceItem.children) {
+          sectionDataSource = [];
+          break;
+        }
+
+        sectionDataSource = dataSourceItem.children;
       }
 
       const subsectionDataList = getSubsectionDataList(
@@ -374,8 +378,15 @@ export default class ReportSection {
   }
 
   createSection(defaultProperties: Partial<ISection>) {
+    let title = "Content";
+    // Inherit title from parent if it is one of the main structural sections
+    const parentTitle = this.properties.title;
+    if (["Header", "Footer", "Page Header", "Page Footer"].includes(parentTitle)) {
+      title = parentTitle;
+    }
+
     const section = new ReportSection({
-      title: "Content",
+      title: title,
       binding: "",
       designer: this._designer,
       parent: this,
@@ -440,6 +451,8 @@ export default class ReportSection {
     this.properties.fontSize = layout.fontSize;
     this.properties.fontWeight = layout.fontWeight;
     if (layout.keepTogether !== undefined) this.properties.keepTogether = layout.keepTogether;
+    if (layout.visibleOnFirstPage !== undefined) this.properties.visibleOnFirstPage = layout.visibleOnFirstPage;
+    if (layout.visibleOnLastPage !== undefined) this.properties.visibleOnLastPage = layout.visibleOnLastPage;
     this.properties.endUpdate();
 
     this.refresh();
@@ -451,6 +464,8 @@ export default class ReportSection {
       binding: this.properties.binding,
       groupBy: this.properties.groupBy || undefined,
       keepTogether: this.properties.keepTogether || undefined,
+      visibleOnFirstPage: this.properties.visibleOnFirstPage,
+      visibleOnLastPage: this.properties.visibleOnLastPage,
       items: this.items.map((x) => x.toJSON()),
       sections: this.subsections.map((x) => x.toJSON()),
       color: this.properties.color,

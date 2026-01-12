@@ -46,13 +46,14 @@ export default class BarcodeReportItem extends BaseReportItem {
     const barcode = this.properties.value || (this.properties.binding ? `[${this.properties.binding}]` : "1234567890");
 
     // Calculate inner dimensions (account for 8px total padding)
+    // Calculate inner dimensions (account for 8px total padding)
     const displayValue = this.properties.displayValue === true;
-    const innerWidth = this.properties.width - 8;
-    const innerHeight = this.properties.height - 8;
-    const barcodeHeight = displayValue 
-      ? Math.max(20, innerHeight - 20)  // Leave space for text
+    const innerWidth = Math.max(0, this.properties.width - 8);
+    const innerHeight = Math.max(0, this.properties.height - 8);
+    const barcodeHeight = displayValue
+      ? Math.max(0, innerHeight - 20)  // Leave space for text
       : innerHeight;
-    
+
     JsBarcode(this.elementSvg, barcode, {
       width: this.properties.barWidth,
       height: barcodeHeight,

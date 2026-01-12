@@ -23,7 +23,7 @@ export default class Renderer {
     if (Array.isArray(options.data)) throw "Data must be an object";
 
     const rootData = this.options.data;
-    
+
     // Resolve page dimensions
     const { width, height } = resolvePageDimensions(
       this.options.layout.pageSize,
@@ -40,16 +40,84 @@ export default class Renderer {
     this.options.element.style.backgroundColor = this.options.layout.backgroundColor || "#ffffff";
 
     // Render page header (shown at top, emulating PDF behavior)
+    // For single page preview, it is both first and last page.
     if (this.options.layout.pageHeaderSection) {
+      const section = this.options.layout.pageHeaderSection;
+      // Default to false if undefined, as per user request (property default is false)
+      const visibleOnFirst = section.visibleOnFirstPage ?? false;
+      const visibleOnLast = section.visibleOnLastPage ?? false;
+
+      const isFirst = true; // Preview is page 1
+      const isLast = true;  // and only 1 page
+
+      let shouldRender = true;
+      if (isFirst && !visibleOnFirst) shouldRender = false;
+      // If it's also last page, and visibleOnLast is false, should we hide it?
+      // Logic: It must be valid for ALL current conditions?
+      // Usually "First Page" takes precedence for "Start". "Last Page" for "End".
+      // If 1 page document: it is First AND Last.
+      // If visibleOnFirst=false, hide. If visibleOnFirst=true, visibleOnLast=false?
+      // If I want it on page 1, I set visibleOnFirst=true.
+      // If I have 1 page, I want it.
+      // If visibleOnFirst=true, visibleOnLast=false. Page 1 is Last.
+      // Conflict.
+      // Standard logic: First Page rule applies to Page 1. Last Page rule applies to Page N.
+      // If Page 1 == Page N:
+      // Option A: logical OR (show if either allows?)
+      // Option B: logical AND (must be allowed by both?)
+      // User said "defaulting to false". So by default HIDDEN.
+      // If I want header on single page report, I must enable BOTH? Or just one?
+      // Let's assume standard "Show on First" / "Show on Last".
+      // If I enable "Show on First", it shows on page 1.
+      // If I enable "Show on Last", it shows on last page.
+      // If I have 1 page, and "Show on First" is True, it shows.
+      // Even if "Show on Last" is False?
+      // Yes, usually "First Page" settings override "Last Page" if conflict, or additive.
+      // Let's go with: Visible if (isFirst ? visibleOnFirst : true) && (isLast ? visibleOnLast : true) ?
+      // No, that implies default is TRUE.
+      // User default is FALSE.
+      // So: Only visible if explicitly allowed.
+      // If 1 page: needs visibleOnFirst=true OR visibleOnLast=true?
+      // Let's start with strict:
+      // If isFirst, check visibleOnFirstPage.
+      // If isLast, check visibleOnLastPage.
+      // If isFirst, ignore visibleOnLastPage?
+      // Let's implement simpler check: 
+      // If isFirst and !visibleOnFirst: Hide.
+      // If isLast and !visibleOnLast: Hide.
+      // So for 1 page: must be visible on BOTH first and last to show? That seems hard.
+      // Maybe just checking First page rule for page 1 is enough for the recursive nature of "First Page properties".
+
+      // Let's stick to: Page 1 checks VisibleOnFirst. Last Page checks VisibleOnLast.
+      // If Page 1 is Last Page: It checks BOTH?
+      // Yes. If I want it on specific single page, I enable both?
+      // Or maybe:
+      // If (isFirst && !visibleOnFirst) render = false;
+      // else if (isLast && !visibleOnLast && !isFirst) render = false; <--- note !isFirst
+      // This implies First Page settings dominate for Page 1.
+
+      if (isFirst && !visibleOnFirst) shouldRender = false;
+      else if (isLast && !visibleOnLast && !isFirst) shouldRender = false;
+
+      // Wait, if 1 page, and visibleOnFirst=True, visibleOnLast=False.
+      // isFirst=true -> !visibleOnFirst is false -> render=true.
+      // isLast=true -> !visibleOnLast is true. if we checked isLast, it would hide.
+      // My logic line 73 prevents checking isLast if isFirst is handled.
+      // This means for 1 page doc, only visibleOnFirst matters. Correct?
+      // Usually yes. "First Page" is the most specific state of Page 1.
+
+      const initialPage = this.options.layout.initialPageNumber ?? 0;
+
       const pageHeaderSection = this.createPageSection(
         this.options.layout.pageHeaderSection,
         rootData,
-        1, // Page 1 for preview
-        1  // Total pages (estimate)
+        initialPage,
+        1
       );
       pageHeaderSection.element.style.borderBottom = "1px dashed #ccc";
       pageHeaderSection.element.setAttribute("data-section-type", "page-header");
       this.options.element.appendChild(pageHeaderSection.element);
+      this.options.element.appendChild(pageHeaderSection.elementSections);
     }
 
     // Render header section
@@ -62,7 +130,7 @@ export default class Renderer {
       { rootData },
     );
     this.options.element.appendChild(this.headerSection.element);
-
+    this.options.element.appendChild(this.headerSection.elementSections);
     // Render content sections
     const contentProperty = this.options.layout.contentSection.binding;
     const contentData = contentProperty ? this.options.data[contentProperty] : null;
@@ -101,18 +169,36 @@ export default class Renderer {
       { rootData },
     );
     this.options.element.appendChild(this.footerSection.element);
+    this.options.element.appendChild(this.footerSection.elementSections);
+    // ... (footer section rendered) ...
 
     // Render page footer (shown at bottom, emulating PDF behavior)
     if (this.options.layout.pageFooterSection) {
-      const pageFooterSection = this.createPageSection(
-        this.options.layout.pageFooterSection,
-        rootData,
-        1,
-        1
-      );
-      pageFooterSection.element.style.borderTop = "1px dashed #ccc";
-      pageFooterSection.element.setAttribute("data-section-type", "page-footer");
-      this.options.element.appendChild(pageFooterSection.element);
+      const section = this.options.layout.pageFooterSection;
+      const visibleOnFirst = section.visibleOnFirstPage ?? false;
+      const visibleOnLast = section.visibleOnLastPage ?? false;
+
+      const isFirst = true;
+      const isLast = true;
+
+      let shouldRender = true;
+      if (isFirst && !visibleOnFirst) shouldRender = false;
+      else if (isLast && !visibleOnLast && !isFirst) shouldRender = false;
+
+      if (shouldRender) {
+        const initialPage = this.options.layout.initialPageNumber ?? 0;
+
+        const pageFooterSection = this.createPageSection(
+          this.options.layout.pageFooterSection,
+          rootData,
+          initialPage,
+          1
+        );
+        pageFooterSection.element.style.borderTop = "1px dashed #ccc";
+        pageFooterSection.element.setAttribute("data-section-type", "page-footer");
+        this.options.element.appendChild(pageFooterSection.element);
+        this.options.element.appendChild(pageFooterSection.elementSections);
+      }
     }
   }
 
@@ -124,20 +210,20 @@ export default class Renderer {
   ): Section {
     // Create a modified section with page variables resolved
     const modifiedLayout = { ...sectionLayout };
-    
+
     // Create section with page context
     const section = new Section(
       modifiedLayout,
       rootData,
       [this.options.layout],
       undefined,
-      { 
+      {
         rootData,
         pageNum,
         totalPages,
       },
     );
-    
+
     return section;
   }
 

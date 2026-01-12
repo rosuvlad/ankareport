@@ -44,7 +44,7 @@ export function generateItemsWithSections(layout: ILayout, data: any, genContext
   if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
     const contentArray = data[layout.contentSection.binding];
     const keepTogether = layout.contentSection.keepTogether ?? false;
-    
+
     if (layout.contentSection.groupBy) {
       const groupedResult = processGroupedContentWithSections(topMargin, layout.contentSection, contentArray, { rootData, ...genContext });
       topMargin += groupedResult.height;
@@ -182,7 +182,7 @@ export function generateItems(layout: ILayout, data: any, genContext?: GenerateC
 
   if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
     const contentArray = data[layout.contentSection.binding];
-    
+
     // Check if grouping is enabled
     if (layout.contentSection.groupBy) {
       const groupedResult = processGroupedContent(topMargin, layout.contentSection, contentArray, { rootData, ...genContext });
@@ -299,7 +299,7 @@ interface SectionContext {
 
 function calculateAutoHeight(section: ISection): number {
   let maxBottom = 0;
-  
+
   // Use original section item positions (before topMargin is added)
   for (const item of section.items || []) {
     const itemBottom = (item.y || 0) + (item.height || 0);
@@ -307,7 +307,7 @@ function calculateAutoHeight(section: ISection): number {
       maxBottom = itemBottom;
     }
   }
-  
+
   return maxBottom + 10; // Add padding
 }
 
@@ -373,7 +373,7 @@ function getSectionItems(topMargin: number, section: ISection, data: any, index?
     // Handle chart bindings
     if (result.type === "chart") {
       const chartResult = result as any;
-      
+
       // Resolve labels binding
       if (chartResult.labelsBinding) {
         const labels = evaluateExpression(chartResult.labelsBinding, context);
@@ -381,34 +381,44 @@ function getSectionItems(topMargin: number, section: ISection, data: any, index?
           chartResult.labels = labels.map((l: any) => String(l));
         }
       }
-      
+
       // Resolve datasets binding
       if (chartResult.datasetsBinding) {
+
         const datasets = evaluateExpression(chartResult.datasetsBinding, context);
-        try { console.log(`[PDF-DEBUG-6] datasetsBinding result:`, typeof datasets, Array.isArray(datasets)); } catch(e) {}
+
         if (Array.isArray(datasets)) {
-          // Process each dataset for label bindings
-          chartResult.datasets = datasets.map((ds: any) => {
-            const resolvedDs = { ...ds };
-            if (ds.labelBinding) {
-              resolvedDs.label = String(evaluateExpression(ds.labelBinding, context) ?? ds.label ?? "");
-            }
-            if (ds.dataBinding) {
-              const data = evaluateExpression(ds.dataBinding, context);
-              if (Array.isArray(data)) {
-                resolvedDs.data = data;
-              }
-            }
-            return resolvedDs;
-          });
+          chartResult.datasets = datasets;
         }
       }
-      
+
+      // Process datasets (whether from binding or static layout)
+      if (Array.isArray(chartResult.datasets)) {
+        chartResult.datasets = chartResult.datasets.map((ds: any) => {
+          const resolvedDs = { ...ds };
+
+          if (ds.labelBinding) {
+            resolvedDs.label = String(evaluateExpression(ds.labelBinding, context) ?? ds.label ?? "");
+          }
+
+          if (ds.dataBinding) {
+            const data = evaluateExpression(ds.dataBinding, context);
+
+            if (Array.isArray(data)) {
+              resolvedDs.data = data;
+            }
+          }
+
+          // Also resolve backgroundColor/borderColor if needed (optional enhancement)
+          return resolvedDs;
+        });
+      }
+
       // Resolve title binding (supports LOCALIZE)
       if (chartResult.titleBinding) {
         chartResult.title = String(evaluateExpression(chartResult.titleBinding, context) ?? chartResult.title ?? "");
       }
-      
+
       // Resolve legend title binding
       if (chartResult.legend?.titleBinding) {
         chartResult.legend = {
@@ -416,7 +426,7 @@ function getSectionItems(topMargin: number, section: ISection, data: any, index?
           title: String(evaluateExpression(chartResult.legend.titleBinding, context) ?? chartResult.legend.title ?? ""),
         };
       }
-      
+
       // Resolve axis title bindings
       if (chartResult.scales?.x?.title?.textBinding) {
         chartResult.scales = {
@@ -442,7 +452,7 @@ function getSectionItems(topMargin: number, section: ISection, data: any, index?
           },
         };
       }
-      
+
       // Resolve axis min/max bindings
       if (chartResult.scales?.y?.minBinding) {
         const min = evaluateExpression(chartResult.scales.y.minBinding, context);
@@ -504,4 +514,21 @@ function getSectionItems(topMargin: number, section: ISection, data: any, index?
     height,
     items,
   };
+}
+
+export function generatePageSectionItems(
+  section: ISection,
+  data: any,
+  yOffset: number,
+  context: ExpressionContext
+): IReportItem[] {
+  // Reuse getSectionItems to handle all item types (text, charts, etc.)
+  // and all bindings/expressions correctly.
+  const sectionItems = getSectionItems(yOffset, section, data, undefined, {
+    rootData: context.rootData,
+    pageNum: context.pageNum,
+    totalPages: context.totalPages
+  });
+
+  return sectionItems.items;
 }

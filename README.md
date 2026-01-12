@@ -40,9 +40,10 @@ Free & Open Source Web Reporting Tool with visual designer, data binding, and mu
 - Nested object access: `binding: "object.nested.field"`
 - Array access: `binding: "items[0].name"`
 - Expressions: `binding: "price * quantity"`
+- Arrow Functions: `binding: "items.map(x => x.name).join(', ')"`
 - String concatenation: `binding: "firstName + ' ' + lastName"`
 - Built-in variables: `$index`, `$rowNum`, `$pageNum`, `$totalPages`
-- Localization: `binding: "LOCALIZE('key')"`
+- Localization: `binding: "localize('key')"`
 
 ### Formatting
 - Number formats: `format: "f2"` (2 decimal places), `format: "f0"` (integer)
@@ -199,6 +200,7 @@ const layout = {
   // Page header/footer (appears on every PDF page)
   pageHeaderSection: { ... },
   pageFooterSection: { ... },
+  initialPageNumber: 0,                   // Start page numbering from this value (default: 0)
   
   // Report sections
   headerSection: { ... },
@@ -330,7 +332,7 @@ const layout = {
   
   // Title
   title: "Monthly Sales",
-  titleBinding: "LOCALIZE('chart_title')",
+  titleBinding: "localize('chart_title')",
   
   // Legend
   showLegend: true,
@@ -388,12 +390,12 @@ Available when `context.temporal` is provided in data:
 
 | Function | Description | Example |
 |----------|-------------|---------|
-| `LOCALIZE(key)` | Get localized string | `LOCALIZE('report_title')` |
-| `SUM(array)` | Sum array values | `SUM(items.map(i => i.amount))` |
-| `AVG(array)` | Average array values | `AVG(scores)` |
-| `COUNT(array)` | Count array items | `COUNT(items)` |
-| `MIN(array)` | Minimum value | `MIN(prices)` |
-| `MAX(array)` | Maximum value | `MAX(prices)` |
+| `localize(key)` | Get localized string | `localize('report_title')` |
+| `sum(array)` | Sum array values | `sum(items.map(i => i.amount))` |
+| `avg(array)` | Average array values | `avg(scores)` |
+| `count(array)` | Count array items | `count(items)` |
+| `min(array)` | Minimum value | `min(prices)` |
+| `max(array)` | Maximum value | `max(prices)` |
 
 ### Filters (Pipe Syntax)
 
@@ -542,16 +544,16 @@ Use in layout:
 
 ```js
 // Basic usage - returns key if not found
-{ type: "text", binding: "LOCALIZE('report_title')" }
+{ type: "text", binding: "localize('report_title')" }
 
 // With default text fallback
-{ type: "text", binding: "LOCALIZE('report_title', 'Annual Report')" }
+{ type: "text", binding: "localize('report_title', 'Annual Report')" }
 
 // With explicit locale override
-{ type: "text", binding: "LOCALIZE('report_title', 'Annual Report', 'es-ES')" }
+{ type: "text", binding: "localize('report_title', 'Annual Report', 'es-ES')" }
 
 // With dynamic key from data
-{ type: "text", binding: "LOCALIZE(labelKey, 'Default')" }
+{ type: "text", binding: "localize(labelKey, 'Default')" }
 ```
 
 ## Page Sizes
@@ -585,6 +587,28 @@ yarn install
 yarn dev
 # open localhost:8080
 ```
+
+## Testing
+
+The project uses [Jest](https://jestjs.io/) for unit and integration testing.
+
+```sh
+# Run all tests
+npm test
+
+# Run specific test file
+npm test src/renderer/renderer.test.ts
+
+# Run tests in watch mode
+npm test -- --watch
+```
+
+Tests cover:
+- **Core Logic**: Expressions, formatting, layout generation.
+- **Renderer**: DOM generation and section rendering (via JSDOM).
+- **Exporters**: Excel export logic (verified with Node environment).
+- **Components**: Property grid editors and event handling.
+
 
 ## License
 

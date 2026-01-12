@@ -3,9 +3,10 @@ import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 import { Chart, registerables } from "chart.js";
 import { ILayout, IReportItem, ISection, IBarcodeReportItem, IQRCodeReportItem, IChartReportItem } from "../core/layout";
-import { generateItemsWithSections, GenerateContext, SectionGroup } from "../core/utils/generate";
+import { generateItemsWithSections, GenerateContext, SectionGroup, generatePageSectionItems } from "../core/utils/generate";
 import { evaluateExpression, ExpressionContext } from "../core/utils/expression";
 import { resolvePageDimensions } from "../core/utils/pageSize";
+import { pxToPt, parseSizeToPt } from "../core/utils/units";
 
 Chart.register(...registerables);
 
@@ -24,7 +25,7 @@ interface FontCache {
 
 async function embedFonts(doc: PDFDocument): Promise<FontCache> {
   const fonts: FontCache = {};
-  
+
   // Embed standard fonts with regular and bold variants
   fonts['Helvetica'] = await doc.embedFont(StandardFonts.Helvetica);
   fonts['Helvetica-Bold'] = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -32,14 +33,14 @@ async function embedFonts(doc: PDFDocument): Promise<FontCache> {
   fonts['Times-Bold'] = await doc.embedFont(StandardFonts.TimesRomanBold);
   fonts['Courier'] = await doc.embedFont(StandardFonts.Courier);
   fonts['Courier-Bold'] = await doc.embedFont(StandardFonts.CourierBold);
-  
+
   return fonts;
 }
 
 function getFont(fonts: FontCache, fontFamily?: string, fontWeight?: string): PDFFont {
   const isBold = fontWeight === 'bold' || fontWeight === '700' || fontWeight === '800' || fontWeight === '900';
   const family = (fontFamily || 'Helvetica').toLowerCase();
-  
+
   // Map common font families to PDF standard fonts
   if (family.includes('arial') || family.includes('helvetica') || family.includes('sans')) {
     return isBold ? fonts['Helvetica-Bold'] : fonts['Helvetica'];
@@ -48,7 +49,7 @@ function getFont(fonts: FontCache, fontFamily?: string, fontWeight?: string): PD
   } else if (family.includes('courier') || family.includes('mono')) {
     return isBold ? fonts['Courier-Bold'] : fonts['Courier'];
   }
-  
+
   // Default to Helvetica
   return isBold ? fonts['Helvetica-Bold'] : fonts['Helvetica'];
 }
@@ -56,79 +57,147 @@ function getFont(fonts: FontCache, fontFamily?: string, fontWeight?: string): PD
 export async function exportToPdf(layout: ILayout, data: any) {
   // Clear image cache for fresh export
   imageCache.clear();
-  
+
   const doc = await PDFDocument.create();
   const fonts = await embedFonts(doc);
-  
+
   // Resolve page dimensions from pageSize or explicit width/height
-  const { width: pageWidth, height: pageHeight } = resolvePageDimensions(
+  const { width: pageWidthPx, height: pageHeightPx } = resolvePageDimensions(
     layout.pageSize,
     layout.width,
     layout.height
   );
 
+  // Convert page dimensions to points
+  const pageWidth = pxToPt(pageWidthPx);
+  const pageHeight = pxToPt(pageHeightPx);
+
   // Calculate usable page area (accounting for page header/footer)
-  const pageHeaderHeight = layout.pageHeaderSection 
+  const pageHeaderHeightPx = layout.pageHeaderSection
     ? (layout.pageHeaderSection.height === "auto" ? calculateSectionHeight(layout.pageHeaderSection) : layout.pageHeaderSection.height)
     : 0;
-  const pageFooterHeight = layout.pageFooterSection
+  const pageFooterHeightPx = layout.pageFooterSection
     ? (layout.pageFooterSection.height === "auto" ? calculateSectionHeight(layout.pageFooterSection) : layout.pageFooterSection.height)
     : 0;
-  
+
+  const pageHeaderHeight = pxToPt(pageHeaderHeightPx);
+  const pageFooterHeight = pxToPt(pageFooterHeightPx);
+
   const contentAreaTop = PRINT_MARGIN.top + pageHeaderHeight;
   const contentAreaBottom = pageHeight - PRINT_MARGIN.bottom - pageFooterHeight;
   const contentAreaHeight = contentAreaBottom - contentAreaTop;
 
   // Generate all content items with section grouping info
   const { items: allItems, sectionGroups } = generateItemsWithSections(layout, data, { rootData: data });
-  
-  // Paginate items respecting keepTogether sections
-  const pages = paginateItems(allItems, sectionGroups, contentAreaHeight, contentAreaTop);
+
+  // Convert pagination logic to use Points
+  const allItemsPt = allItems.map(item => convertItemToPt(item));
+  const sectionGroupsPt = sectionGroups.map(group => ({
+    ...group,
+    startY: pxToPt(group.startY),
+    endY: pxToPt(group.endY)
+  }));
+
+  const pages = paginateItems(allItemsPt, sectionGroupsPt, contentAreaHeight, contentAreaTop);
   const totalPages = Math.max(1, pages.length);
-  
+
   for (let pageNum = 0; pageNum < totalPages; pageNum++) {
     const currentPage = doc.addPage([pageWidth, pageHeight]);
     const pageData = pages[pageNum] || { items: [], yOffset: 0 };
-    
+
     // Render content items for this page
     await renderItems(currentPage, pageData.items, pageHeight, pageData.yOffset, fonts, doc);
-    
+
+    // Render page header (if defined)
     // Render page header (if defined)
     if (layout.pageHeaderSection) {
-      const pageContext: ExpressionContext = {
-        data,
-        rootData: data,
-        pageNum: pageNum + 1,
-        totalPages,
-      };
-      const pageHeaderItems = generatePageSectionItems(
-        layout.pageHeaderSection,
-        data,
-        PRINT_MARGIN.top,
-        pageContext
-      );
-      await renderItems(currentPage, pageHeaderItems, pageHeight, 0, fonts, doc);
+      const isFirstPage = pageNum === 0;
+      const isLastPage = pageNum === totalPages - 1;
+      const visibleOnFirst = layout.pageHeaderSection.visibleOnFirstPage ?? false;
+      const visibleOnLast = layout.pageHeaderSection.visibleOnLastPage ?? false;
+
+      let shouldRender = true;
+      if (isFirstPage && !visibleOnFirst) shouldRender = false;
+      else if (isLastPage && !visibleOnLast && !isFirstPage) shouldRender = false;
+
+      if (shouldRender) {
+        const initialPage = layout.initialPageNumber ?? 0;
+        const displayPageNum = pageNum + initialPage;
+
+        const pageContext: ExpressionContext = {
+          data,
+          rootData: data,
+          pageNum: displayPageNum,
+          totalPages,
+        };
+        const pageHeaderItems = generatePageSectionItems(
+          layout.pageHeaderSection,
+          data,
+          PRINT_MARGIN.top,
+          pageContext
+        );
+        // Header item positions generated in pixels, convert to points
+        const pageHeaderItemsPt = pageHeaderItems.map(x => convertItemToPt(x));
+        await renderItems(currentPage, pageHeaderItemsPt, pageHeight, 0, fonts, doc);
+      }
     }
-    
+
+    // Render page footer (if defined)
     // Render page footer (if defined)
     if (layout.pageFooterSection) {
-      const pageContext: ExpressionContext = {
-        data,
-        rootData: data,
-        pageNum: pageNum + 1,
-        totalPages,
-      };
-      const pageFooterItems = generatePageSectionItems(
-        layout.pageFooterSection,
-        data,
-        pageHeight - pageFooterHeight - PRINT_MARGIN.bottom,
-        pageContext
-      );
-      await renderItems(currentPage, pageFooterItems, pageHeight, 0, fonts, doc);
+      const isFirstPage = pageNum === 0;
+      const isLastPage = pageNum === totalPages - 1;
+      const visibleOnFirst = layout.pageFooterSection.visibleOnFirstPage ?? false;
+      const visibleOnLast = layout.pageFooterSection.visibleOnLastPage ?? false;
+
+      let shouldRender = true;
+      if (isFirstPage && !visibleOnFirst) shouldRender = false;
+      else if (isLastPage && !visibleOnLast && !isFirstPage) shouldRender = false;
+
+      if (shouldRender) {
+        // Calculate effective page number
+        const initialPage = layout.initialPageNumber ?? 0;
+        const displayPageNum = pageNum + initialPage;
+
+        const pageContext: ExpressionContext = {
+          data,
+          rootData: data,
+          pageNum: displayPageNum,
+          totalPages,
+        };
+        // Calculate Y position for footer
+        const footerYPt = pageHeight - pageFooterHeight - PRINT_MARGIN.bottom;
+
+        const pageFooterItems = generatePageSectionItems(
+          layout.pageFooterSection,
+          data,
+          0,
+          pageContext
+        );
+
+        const pageFooterItemsPt = pageFooterItems.map(x => {
+          const ptItem = convertItemToPt(x);
+          ptItem.y += footerYPt; // Shift to footer position
+          return ptItem;
+        });
+
+        await renderItems(currentPage, pageFooterItemsPt, pageHeight, 0, fonts, doc);
+      }
     }
   }
 
   return await doc.save();
+}
+
+function convertItemToPt(item: IReportItem): IReportItem {
+  return {
+    ...item,
+    x: pxToPt(item.x),
+    y: pxToPt(item.y),
+    width: pxToPt(item.width),
+    height: pxToPt(item.height),
+    fontSize: item.fontSize ? `${parseSizeToPt(item.fontSize)}pt` : undefined,
+  } as IReportItem;
 }
 
 function calculateSectionHeight(section: ISection): number {
@@ -160,7 +229,7 @@ function paginateItems(
 
   // Sort items by Y position
   const sortedItems = [...items].sort((a, b) => a.y - b.y);
-  
+
   // Build a map of item Y positions to their section groups (for keepTogether)
   const itemToGroup = new Map<number, SectionGroup>();
   for (const group of sectionGroups) {
@@ -178,15 +247,15 @@ function paginateItems(
     const item = sortedItems[i];
     const itemRelativeY = item.y - currentPageStartY;
     const itemHeight = item.height;
-    
+
     // Check if this item belongs to a keepTogether group
     const group = itemToGroup.get(item.y);
-    
+
     if (group && group.keepTogether) {
       // Calculate the total height of the keepTogether group
       const groupHeight = group.endY - group.startY;
       const groupRelativeY = group.startY - currentPageStartY;
-      
+
       // Check if the entire group fits on current page
       if (groupRelativeY + groupHeight > contentAreaHeight && currentPageItems.length > 0) {
         // Start new page - group doesn't fit
@@ -198,7 +267,7 @@ function paginateItems(
         currentPageItems = [];
         currentPageUsedHeight = 0;
       }
-      
+
       // Add all items from this group to current page
       while (i < sortedItems.length) {
         const groupItem = sortedItems[i];
@@ -219,13 +288,13 @@ function paginateItems(
         currentPageItems = [];
         currentPageUsedHeight = 0;
       }
-      
+
       currentPageItems.push(item);
       currentPageUsedHeight = Math.max(currentPageUsedHeight, item.y + item.height - currentPageStartY);
       i++;
     }
   }
-  
+
   // Add remaining items as last page
   if (currentPageItems.length > 0) {
     pages.push({
@@ -233,41 +302,19 @@ function paginateItems(
       yOffset: -currentPageStartY + contentAreaTop,
     });
   }
-  
+
   // Ensure at least one page
   if (pages.length === 0) {
+    // Check if we have items to output or just empty structure
+    // If the report is completely empty, adding an empty page is fine.
+    // If contentAreaTop puts us off page?
     pages.push({ items: [], yOffset: contentAreaTop });
   }
-  
+
   return pages;
 }
 
-function generatePageSectionItems(
-  section: ISection,
-  data: any,
-  yOffset: number,
-  context: ExpressionContext
-): IReportItem[] {
-  const items: IReportItem[] = [];
-
-  section.items?.forEach(item => {
-    const result = { ...item } as IReportItem;
-    result.y = yOffset + item.y;
-
-    if (result.type === "text" && result.binding) {
-      const value = evaluateExpression(result.binding, context);
-      (result as any).text = String(value ?? "");
-    }
-
-    if (!result.color) result.color = "#000000";
-    if (!result.fontSize) result.fontSize = "12px";
-    if (!result.fontFamily) result.fontFamily = "Arial";
-
-    items.push(result);
-  });
-
-  return items;
-}
+// generatePageSectionItems removed (imported from generate.ts)
 
 // Cache for embedded images to avoid re-generating
 const imageCache = new Map<string, any>();
@@ -282,18 +329,24 @@ async function renderItems(
 ) {
   for (const item of items) {
     // Skip items that are outside the visible page area
-    const itemY = pageHeight - item.y - item.height + yOffset;
-    if (itemY < -item.height || itemY > pageHeight + item.height) {
+    // item.y is the top position in continuous layout
+    // yOffset shifts it to page coordinates
+
+    // Calculate final Y position on THIS PDF page (from bottom)
+    // PageHeight (Pt) - (ItemTopY (Pt) + yOffset (Pt)) - ItemHeight (Pt)
+    const itemTopRelative = item.y + yOffset;
+    const itemBottomPdf = pageHeight - itemTopRelative - item.height;
+
+    if (itemBottomPdf < -item.height || itemBottomPdf > pageHeight + item.height) {
       continue;
     }
+
     if (item.type === "text") {
-      const itemTopY = pageHeight - item.y - item.height + yOffset;
-      
       // Draw background and border first
       if ((item.borderWidth && item.borderColor) || item.backgroundColor) {
         page.drawRectangle({
           x: item.x,
-          y: itemTopY,
+          y: itemBottomPdf,
           width: item.width,
           height: item.height,
           borderColor: item.borderColor ? hexToRgb(item.borderColor) : undefined,
@@ -304,44 +357,21 @@ async function renderItems(
 
       // Get the appropriate font based on fontFamily and fontWeight
       const font = getFont(fonts, item.fontFamily, item.fontWeight);
-      const fontSize = parseInt((item.fontSize || "12px").replace("px", ""));
+      // Item fontSize is already converted to '...pt' in convertItemToPt
+      const fontSize = parseSizeToPt(item.fontSize || "12pt");
       const text = String(item.text ?? "");
-      
+
       if (!text) continue; // Skip empty text
-      
-      const textWidth = font.widthOfTextAtSize(text, fontSize);
-      
-      // PDF text is positioned at baseline, not top
-      // Use ascender height for proper vertical centering
-      const ascent = font.heightAtSize(fontSize) * 0.75; // Approximate ascender
-      const descent = font.heightAtSize(fontSize) * 0.25; // Approximate descender
-      
-      // Calculate X position based on text alignment with small padding
-      const padding = 2;
-      let textX = item.x + padding;
-      if (item.textAlign === "center") {
-        textX = item.x + (item.width - textWidth) / 2;
-      } else if (item.textAlign === "right") {
-        textX = item.x + item.width - textWidth - padding;
-      }
 
-      // Vertically center text baseline in the item height
-      // Position = bottom of box + (box height - text height) / 2 + ascent
-      const textY = itemTopY + (item.height - (ascent + descent)) / 2 + descent;
+      // Draw Text with Wrapping
+      drawWrappingText(page, text, item.x, itemBottomPdf, item.width, item.height, font, fontSize, item.color, item.textAlign);
 
-      page.drawText(text, {
-        x: Math.max(item.x, textX), // Ensure text doesn't go outside left bound
-        y: textY,
-        color: hexToRgb(item.color) || rgb(0, 0, 0),
-        font: font,
-        size: fontSize,
-      });
     } else if (item.type === "image" && item.source) {
       try {
         const image = await doc.embedPng(item.source);
         page.drawImage(image, {
           x: item.x,
-          y: pageHeight - item.y - item.height + yOffset,
+          y: itemBottomPdf,
           width: item.width,
           height: item.height,
         });
@@ -352,40 +382,40 @@ async function renderItems(
       const barcodeItem = item as IBarcodeReportItem;
       const barcodeValue = barcodeItem.value || "0000000000";
       const displayValue = barcodeItem.displayValue ?? false;
-      // Account for 4px padding on each side (8px total)
-      const innerWidth = item.width - 8;
-      const innerHeight = item.height - 8;
+      const innerWidth = item.width - 2;
+      const innerHeight = item.height - 2;
       const cacheKey = `barcode:${barcodeValue}:${barcodeItem.format}:${innerWidth}:${innerHeight}:${displayValue}`;
       try {
         let image = imageCache.get(cacheKey);
         if (!image) {
-          const pngDataUrl = await generateBarcodePng(barcodeValue, barcodeItem.format || "CODE128", innerWidth, innerHeight, barcodeItem.barWidth || 1, displayValue);
+          // generateBarcodePng expects pixels
+          const imgW = ptToPx(innerWidth);
+          const imgH = ptToPx(innerHeight);
+
+          const pngDataUrl = await generateBarcodePng(barcodeValue, barcodeItem.format || "CODE128", imgW, imgH, barcodeItem.barWidth || 1, displayValue);
           const pngData = pngDataUrl.split(',')[1];
           const pngBytes = Uint8Array.from(atob(pngData), c => c.charCodeAt(0));
           image = await doc.embedPng(pngBytes);
           imageCache.set(cacheKey, image);
         }
-        // Draw with 4px padding offset
         page.drawImage(image, {
-          x: item.x + 4,
-          y: pageHeight - item.y - item.height + yOffset + 4,
+          x: item.x + 1,
+          y: itemBottomPdf + 1,
           width: innerWidth,
           height: innerHeight,
         });
-      } catch (e) {
-        // Skip invalid barcodes
-      }
+      } catch (e) { }
     } else if (item.type === "qrcode") {
       const qrItem = item as IQRCodeReportItem;
       const qrValue = qrItem.value || "https://example.com";
-      // Account for 4px padding on each side (8px total)
-      const innerSize = Math.min(item.width, item.height) - 8;
+      const innerSize = Math.min(item.width, item.height) - 2;
       const cacheKey = `qrcode:${qrValue}:${innerSize}`;
       try {
         let image = imageCache.get(cacheKey);
         if (!image) {
+          const imgSize = ptToPx(innerSize);
           const pngDataUrl = await QRCode.toDataURL(qrValue, {
-            width: innerSize,
+            width: imgSize,
             margin: 0,
             errorCorrectionLevel: qrItem.errorCorrectionLevel || "M",
           });
@@ -394,51 +424,120 @@ async function renderItems(
           image = await doc.embedPng(pngBytes);
           imageCache.set(cacheKey, image);
         }
-        // Draw with 4px padding offset
         page.drawImage(image, {
-          x: item.x + 4,
-          y: pageHeight - item.y - item.height + yOffset + 4,
+          x: item.x + 1,
+          y: itemBottomPdf + 1,
           width: innerSize,
           height: innerSize,
         });
-        console.log(`[PDF-DEBUG-4] QR rendered: ${qrValue.slice(0,30)}...`);
-      } catch (e) {
-        console.error("[PDF-DEBUG-4-ERR] QR code error:", e);
-      }
+      } catch (e) { }
     } else if (item.type === "chart") {
       const chartItem = item as IChartReportItem;
       const cacheKey = `chart:${item.x}:${item.y}:${item.width}:${item.height}:${chartItem.chartType}`;
       try {
         let image = imageCache.get(cacheKey);
         if (!image) {
-          const base64 = await generateChartPng(chartItem);
+          const imgW = ptToPx(item.width);
+          const imgH = ptToPx(item.height);
+          const base64 = await generateChartPng({ ...chartItem, width: imgW, height: imgH });
           const pngBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
           image = await doc.embedPng(pngBytes);
           imageCache.set(cacheKey, image);
         }
         page.drawImage(image, {
           x: item.x,
-          y: pageHeight - item.y - item.height + yOffset,
+          y: itemBottomPdf,
           width: item.width,
           height: item.height,
         });
-        console.log(`[PDF-DEBUG-5] Chart rendered: ${chartItem.chartType}`);
-      } catch (e) {
-        console.error("[PDF-DEBUG-5-ERR] Chart error:", e);
-      }
+      } catch (e) { }
     }
   }
 }
+
+function drawWrappingText(
+  page: PDFPage,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  font: PDFFont,
+  fontSize: number,
+  colorHex: string | undefined,
+  align: string | undefined
+) {
+  const color = hexToRgb(colorHex) || rgb(0, 0, 0);
+  const lineHeight = fontSize * 1.2;
+
+  // 1. Split text into lines
+  const words = text.split(' ');
+
+  const linesCorrected: string[] = [];
+
+  if (words.length === 0 && text.length > 0) {
+    linesCorrected.push(text);
+  } else if (words.length > 0) {
+    let currentLineC = words[0];
+    const maxLineWidth = width - 4; // 2pt padding
+
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const testLine = currentLineC + " " + word;
+      const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+
+      if (testWidth <= maxLineWidth) {
+        currentLineC = testLine;
+      } else {
+        linesCorrected.push(currentLineC);
+        currentLineC = word;
+      }
+    }
+    linesCorrected.push(currentLineC);
+  }
+
+  // 2. Draw lines
+  const ascent = font.heightAtSize(fontSize) * 0.8;
+  let currentY = y + height - ascent - 2;
+
+  for (const line of linesCorrected) {
+    if (currentY < y) break;
+
+    const lineWidth = font.widthOfTextAtSize(line, fontSize);
+    let lineX = x + 2;
+
+    if (align === "center") {
+      lineX = x + (width - lineWidth) / 2;
+    } else if (align === "right") {
+      lineX = x + width - lineWidth - 2;
+    }
+
+    page.drawText(line, {
+      x: lineX,
+      y: currentY,
+      size: fontSize,
+      font: font,
+      color: color
+    });
+
+    currentY -= lineHeight;
+  }
+}
+
+
+function ptToPx(pt: number): number {
+  return pt * (96 / 72);
+}
+
+// ... original helper functions ...
 
 async function generateChartPng(chartItem: IChartReportItem): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = chartItem.width;
   canvas.height = chartItem.height;
-  
+
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not get canvas context');
-
-  console.log(`[PDF-DEBUG-3] Chart: type=${chartItem.chartType}, labels=${JSON.stringify(chartItem.labels)?.slice(0,100)}, datasets=${chartItem.datasets?.length || 0}`);
 
   const chartData = {
     labels: chartItem.labels || ["Label 1", "Label 2", "Label 3"],
@@ -474,7 +573,6 @@ async function generateChartPng(chartItem: IChartReportItem): Promise<string> {
     },
   };
 
-  // Add scales configuration for bar/line charts
   if (["bar", "line", "radar"].includes(chartItem.chartType)) {
     chartOptions.scales = {
       x: {
@@ -509,19 +607,17 @@ async function generateChartPng(chartItem: IChartReportItem): Promise<string> {
     options: chartOptions,
   });
 
-  // Chart renders synchronously with animation: false
   const dataUrl = canvas.toDataURL('image/png');
   chart.destroy();
-  
+
   return dataUrl.split(',')[1];
 }
 
 async function generateBarcodePng(value: string, format: string, width: number, height: number, barWidth: number, displayValue: boolean = false): Promise<string> {
-  // Create a canvas element for barcode generation
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  
+
   JsBarcode(canvas, value, {
     format: format,
     width: barWidth,
@@ -529,34 +625,25 @@ async function generateBarcodePng(value: string, format: string, width: number, 
     displayValue: displayValue,
     margin: 0,
   });
-  
+
   return canvas.toDataURL('image/png');
 }
 
 function splitItemsByPage(items: IReportItem[], pageHeight: number): IReportItem[][] {
-  // Safeguard: ensure pageHeight is at least 100 to prevent infinite loops
   const safePageHeight = Math.max(100, pageHeight);
-  
   const result: IReportItem[][] = [];
   let pageNumber = 1;
   const maxItemBottomY = items.reduce((max, item) => Math.max(max, item.y + item.height), 0);
-
-  // Safeguard: limit to 100 pages max
   const maxPages = 100;
 
   while (pageNumber <= maxPages) {
     const pageTopY = (pageNumber - 1) * safePageHeight;
     const pageBottomY = pageNumber * safePageHeight;
-
     const pageItems = items.filter(item => isItemInArea(item, pageTopY, pageBottomY));
-
     result.push(pageItems);
-
     if (maxItemBottomY <= pageBottomY) break;
-
     pageNumber++;
   }
-
   return result;
 }
 
@@ -569,13 +656,10 @@ export interface KeepTogetherGroup {
 export function groupItemsForKeepTogether(items: IReportItem[], sectionHeight: number): KeepTogetherGroup[] {
   const groups: KeepTogetherGroup[] = [];
   let currentGroup: KeepTogetherGroup | null = null;
-  
-  // Sort items by Y position
   const sortedItems = [...items].sort((a, b) => a.y - b.y);
-  
+
   for (const item of sortedItems) {
     const itemSectionStart = Math.floor(item.y / sectionHeight) * sectionHeight;
-    
     if (!currentGroup || itemSectionStart !== currentGroup.startY) {
       if (currentGroup) {
         groups.push(currentGroup);
@@ -590,21 +674,18 @@ export function groupItemsForKeepTogether(items: IReportItem[], sectionHeight: n
       currentGroup.endY = Math.max(currentGroup.endY, item.y + item.height);
     }
   }
-  
+
   if (currentGroup) {
     groups.push(currentGroup);
   }
-  
+
   return groups;
 }
 
 function isItemInArea(item: IReportItem, top: number, bottom: number) {
   if (top < item.y && item.y < bottom) return true;
-
   const bottomY = item.y + item.height;
-
   if (top < bottomY && bottomY < bottom) return true;
-
   return false;
 }
 
@@ -612,7 +693,6 @@ function hexToRgb(hex: string | undefined) {
   if (!hex || hex === "transparent") return undefined;
 
   const hexString = hex.startsWith('#') ? hex.slice(1) : hex;
-
   let r, g, b;
 
   if (hexString.length === 3) {

@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { getExcelMeta } from "./excel-exporter";
 
 describe("Export To Excel", () => {
@@ -42,4 +45,37 @@ describe("Export To Excel", () => {
     // expect(meta.getBeforeCellName(25, 25)).toBe("D3");
     // expect(meta.getBeforeCellName(65, 60)).toBe("G8");
   });
+
+  test("handles large number of columns correctly", () => {
+    // Create items that force columns beyond Z (26th letter)
+    // We need enough breakpoints.
+    // Let's manually trigger getColumnName logic via getExcelMeta
+
+    const items: any[] = [];
+    // Add items at x=0, x=10, ..., x=300
+    for (let i = 0; i <= 30; i++) {
+      items.push({ text: 'Col' + i, x: i * 10, y: 0, width: 10, height: 10 });
+    }
+
+    const meta = getExcelMeta(items);
+
+    // Index 0 -> 'A'
+    // Index 25 -> 'Z'
+    // Index 26 -> 'AA'
+
+    const colA = meta.columns.find(c => c.key === 'A');
+    const colZ = meta.columns.find(c => c.key === 'Z');
+    const colAA = meta.columns.find(c => c.key === 'AA');
+    const colAE = meta.columns.find(c => c.key === 'AE');
+
+    expect(colA).toBeDefined();
+    expect(colZ).toBeDefined();
+    expect(colAA).toBeDefined();
+    expect(colAE).toBeDefined();
+
+    // Check specific cell names
+    expect(meta.getCellName(0, 0)).toBe("A1");
+    expect(meta.getCellName(260, 0)).toBe("AA1"); // 26th interval: 260
+  });
 });
+

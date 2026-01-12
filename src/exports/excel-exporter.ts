@@ -3,13 +3,53 @@ import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 import { Chart, registerables } from "chart.js";
 import { ILayout, IReportItem, IBarcodeReportItem, IQRCodeReportItem, IChartReportItem } from "../core/layout";
-import { generateItems } from "../core/utils/generate";
+import { generateItems, generatePageSectionItems } from "../core/utils/generate";
 import { getExcelPaperSize } from "../core/utils/pageSize";
+import { pxToPt } from "../core/utils/units";
 
 Chart.register(...registerables);
 
 export async function exportToXlsx(layout: ILayout, data: any) {
-  const items = generateItems(layout, data, { rootData: data });
+  let items = generateItems(layout, data, { rootData: data });
+
+  // Handle Page Header (Visible on First Page)
+  if (layout.pageHeaderSection && layout.pageHeaderSection.visibleOnFirstPage) {
+    const headerItems = generatePageSectionItems(layout.pageHeaderSection, data, 0, { data, rootData: data });
+
+    // Calculate header height
+    let headerHeight = 0;
+    for (const item of headerItems) {
+      headerHeight = Math.max(headerHeight, item.y + item.height);
+    }
+    // Add small padding
+    headerHeight += 10;
+
+    // Shift content items down
+    items.forEach(item => item.y += headerHeight);
+
+    // Prepend header items
+    items = [...headerItems, ...items];
+  }
+
+  // Handle Page Footer (Visible on Last Page)
+  if (layout.pageFooterSection && layout.pageFooterSection.visibleOnLastPage) {
+    // Find bottom of content
+    let contentBottom = 0;
+    for (const item of items) {
+      contentBottom = Math.max(contentBottom, item.y + item.height);
+    }
+    // Add padding
+    contentBottom += 10;
+
+    const footerItems = generatePageSectionItems(layout.pageFooterSection, data, 0, { data, rootData: data });
+
+    // Shift footer items to bottom
+    footerItems.forEach(item => item.y += contentBottom);
+
+    items = [...items, ...footerItems];
+  }
+
+  // excelMeta works with Pixels as defined in layout (HTML)
   const excelMeta = getExcelMeta(items);
 
   const workbook = new Workbook();
@@ -24,7 +64,11 @@ export async function exportToXlsx(layout: ILayout, data: any) {
     fitToHeight: 0,
   };
 
-  worksheet.columns = excelMeta.columns.map(x => ({ key: x.key, width: x.width * 0.3 }));
+  // Excel column widths are roughly 1/7 of a pixel or something weird (char width).
+  // 0.3 factor is a heuristic.
+  // Standard heuristic: 1px is approx 0.14 units usually?
+  // Let's stick with 0.15 heuristic for now but standardizing via points could be better later.
+  worksheet.columns = excelMeta.columns.map(x => ({ key: x.key, width: pxToPt(x.width) / 5 })); // Adjusted heuristic
 
   for (const item of items) {
     if (item.type === "text") {
@@ -74,7 +118,7 @@ export async function exportToXlsx(layout: ILayout, data: any) {
         const innerWidth = item.width - 8;
         const innerHeight = item.height - 8;
         const base64 = await generateBarcodeBase64(barcodeValue, barcodeItem.format || "CODE128", innerWidth, innerHeight, barcodeItem.barWidth || 1, displayValue);
-        
+
         const imageId = workbook.addImage({
           base64,
           extension: 'png',
@@ -96,7 +140,7 @@ export async function exportToXlsx(layout: ILayout, data: any) {
         const qrValue = qrItem.value || "https://example.com";
         // Account for 4px padding on each side (8px total)
         const innerSize = Math.min(item.width, item.height) - 8;
-        
+
         const dataUrl = await QRCode.toDataURL(qrValue, {
           width: innerSize,
           margin: 0,
@@ -151,7 +195,7 @@ async function generateChartBase64(chartItem: IChartReportItem): Promise<string>
   const canvas = document.createElement('canvas');
   canvas.width = chartItem.width;
   canvas.height = chartItem.height;
-  
+
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not get canvas context');
 
@@ -226,10 +270,10 @@ async function generateChartBase64(chartItem: IChartReportItem): Promise<string>
 
   // Wait for chart to render
   await new Promise(resolve => setTimeout(resolve, 100));
-  
+
   const dataUrl = canvas.toDataURL('image/png');
   chart.destroy();
-  
+
   return dataUrl.split(',')[1];
 }
 
@@ -237,7 +281,7 @@ async function generateBarcodeBase64(value: string, format: string, width: numbe
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  
+
   JsBarcode(canvas, value, {
     format: format,
     width: barWidth,
@@ -245,7 +289,7 @@ async function generateBarcodeBase64(value: string, format: string, width: numbe
     displayValue: displayValue,
     margin: 0,
   });
-  
+
   const dataUrl = canvas.toDataURL('image/png');
   return dataUrl.split(',')[1];
 }
@@ -253,14 +297,14 @@ async function generateBarcodeBase64(value: string, format: string, width: numbe
 function hexToArgb(hex: string): string {
   if (!hex || hex === "transparent") return "00000000";
   const hexString = hex.startsWith('#') ? hex.slice(1) : hex;
-  
+
   if (hexString.length === 3) {
     const r = hexString[0] + hexString[0];
     const g = hexString[1] + hexString[1];
     const b = hexString[2] + hexString[2];
     return `FF${r}${g}${b}`.toUpperCase();
   }
-  
+
   return `FF${hexString}`.toUpperCase();
 }
 
@@ -289,7 +333,7 @@ export function getExcelMeta(items: IReportItem[]) {
 
   for (let i = 0; i < column_breakpoints.length - 1; i++) {
     columns.push({
-      key: String.fromCharCode(65 + i),
+      key: getColumnName(i),
       breakpoint: column_breakpoints[i],
       width: column_breakpoints[i + 1] - column_breakpoints[i],
     });
@@ -304,20 +348,32 @@ export function getExcelMeta(items: IReportItem[]) {
   }
 
   const getCellName = (x: number, y: number) => {
-    const cellName = columns.find(c => c.breakpoint === x)!.key; // TODO: add null check
-    const rowName = rows.find(r => r.breakpoint === y)!.key; // TODO: add null check
+    const col = columns.find(c => c.breakpoint === x);
+    const row = rows.find(r => r.breakpoint === y);
 
-    return `${cellName}${rowName}`;
+    if (!col || !row) return "A1"; // Fallback to avoid crash
+
+    return `${col.key}${row.key}`;
   }
 
   // TODO: Fix name
   const getBeforeCellName = (cell: number, row: number) => {
     const cellIndex = column_breakpoints.findIndex(x => x === cell);
-    const cellName = String.fromCharCode(65 + cellIndex);
+    const cellName = getColumnName(cellIndex >= 0 ? cellIndex : 0);
     const rowIndex = row_breakpoints.findIndex(x => x === row) + 1;
 
     return `${cellName}${rowIndex}`;
   }
 
   return { columns, rows, getCellName, getBeforeCellName };
+}
+
+function getColumnName(index: number): string {
+  let name = '';
+  let num = index;
+  while (num >= 0) {
+    name = String.fromCharCode(65 + (num % 26)) + name;
+    num = Math.floor(num / 26) - 1;
+  }
+  return name;
 }

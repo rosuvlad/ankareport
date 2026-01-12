@@ -227,17 +227,8 @@ export default class Report {
     if (layout.pageSize) this.properties.pageSize = layout.pageSize;
     if (layout.width) this.properties.width = layout.width;
     if (layout.height) this.properties.height = layout.height;
+    if (layout.initialPageNumber) this.properties.initialPageNumber = layout.initialPageNumber;
     this.properties.color = layout.color;
-    this.properties.backgroundColor = layout.backgroundColor;
-    this.properties.textAlign = layout.textAlign;
-    this.properties.borderWidth = layout.borderWidth;
-    this.properties.borderStyle = layout.borderStyle;
-    this.properties.borderColor = layout.borderColor;
-    this.properties.fontFamily = layout.fontFamily;
-    this.properties.fontSize = layout.fontSize;
-    this.properties.fontWeight = layout.fontWeight;
-    this.properties.pageHeaderVisibleOnFirstPage = layout.pageHeaderVisibleOnFirstPage ?? false;
-    this.properties.pageFooterVisibleOnFirstPage = layout.pageFooterVisibleOnFirstPage ?? false;
 
     // Load page header section (optional)
     if (layout.pageHeaderSection) {
@@ -265,13 +256,13 @@ export default class Report {
   toJSON(): ILayout {
     const width = typeof this.properties.width === 'number' ? this.properties.width : undefined;
     const height = typeof this.properties.height === 'number' ? this.properties.height : undefined;
-    
+
     // Only include page header/footer if they have items
     const pageHeaderSection = this.reportSectionPageHeader.toJSON();
     const pageFooterSection = this.reportSectionPageFooter.toJSON();
     const hasPageHeader = pageHeaderSection.items && pageHeaderSection.items.length > 0;
     const hasPageFooter = pageFooterSection.items && pageFooterSection.items.length > 0;
-    
+
     return {
       pageSize: this.properties.pageSize,
       width,

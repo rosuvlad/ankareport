@@ -10,8 +10,7 @@ export default class ReportProperties extends StyleProperties {
   private _pageSize: PageSize | undefined = "A4";
   private _width: number | undefined;
   private _height: number | undefined;
-  private _pageHeaderVisibleOnFirstPage: boolean = false;
-  private _pageFooterVisibleOnFirstPage: boolean = false;
+  private _initialPageNumber: number | undefined;
 
   get pageSize() {
     return this._pageSize;
@@ -25,12 +24,8 @@ export default class ReportProperties extends StyleProperties {
     return this._height;
   }
 
-  get pageHeaderVisibleOnFirstPage() {
-    return this._pageHeaderVisibleOnFirstPage;
-  }
-
-  get pageFooterVisibleOnFirstPage() {
-    return this._pageFooterVisibleOnFirstPage;
+  get initialPageNumber() {
+    return this._initialPageNumber;
   }
 
   set pageSize(value: PageSize | undefined) {
@@ -66,16 +61,15 @@ export default class ReportProperties extends StyleProperties {
     this.emitOnChange("height", this._height, oldValue);
   }
 
-  set pageHeaderVisibleOnFirstPage(value: boolean | string) {
-    const oldValue = this._pageHeaderVisibleOnFirstPage;
-    this._pageHeaderVisibleOnFirstPage = value === true || value === "true";
-    this.emitOnChange("pageHeaderVisibleOnFirstPage", this._pageHeaderVisibleOnFirstPage, oldValue);
-  }
-
-  set pageFooterVisibleOnFirstPage(value: boolean | string) {
-    const oldValue = this._pageFooterVisibleOnFirstPage;
-    this._pageFooterVisibleOnFirstPage = value === true || value === "true";
-    this.emitOnChange("pageFooterVisibleOnFirstPage", this._pageFooterVisibleOnFirstPage, oldValue);
+  set initialPageNumber(value: number | string | undefined) {
+    const oldValue = this._initialPageNumber;
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (numValue !== undefined && numValue !== null && !isNaN(numValue)) {
+      this._initialPageNumber = numValue;
+    } else {
+      this._initialPageNumber = undefined;
+    }
+    this.emitOnChange("initialPageNumber", this._initialPageNumber, oldValue);
   }
 
   getPropertyDefinitions(): Property[] {
@@ -90,9 +84,9 @@ export default class ReportProperties extends StyleProperties {
     ];
 
     return [
-      { 
-        field: "pageSize", 
-        label: "Page Size", 
+      {
+        field: "pageSize",
+        label: "Page Size",
         type: "string",
         editor: new DropdownList({
           items: pageSizeItems,
@@ -101,24 +95,7 @@ export default class ReportProperties extends StyleProperties {
       },
       { field: "width", label: "Width", type: "string" },
       { field: "height", label: "Height", type: "string" },
-      { 
-        field: "pageHeaderVisibleOnFirstPage", 
-        label: "Page Header On First Page", 
-        type: "string",
-        editor: new DropdownList({
-          items: booleanItems,
-          defaultValue: "false",
-        }),
-      },
-      { 
-        field: "pageFooterVisibleOnFirstPage", 
-        label: "Page Footer On First Page", 
-        type: "string",
-        editor: new DropdownList({
-          items: booleanItems,
-          defaultValue: "false",
-        }),
-      },
+      { field: "initialPageNumber", label: "Initial Page Number", type: "number" },
       ...super.getPropertyDefinitions(),
     ];
   }

@@ -1,10 +1,11 @@
-const layout = {
+var layout = {
   "pageSize": "A4",
+  "initialPageNumber": 1,
   "pageHeaderSection": {
     "height": "auto",
     "binding": "",
-    "visibleOnFirstPage": false,
-    "visibleOnLastPage": false,
+    "visibleOnFirstPage": true,
+    "visibleOnLastPage": true,
     "items": [
       {
         "x": 40,

@@ -125,6 +125,8 @@ function createEvaluationScope(context: ExpressionContext): any {
     $rowNum: context.rowNum,
     $groupKey: context.groupKey,
     $groupCount: context.groupCount,
+    $pageNum: context.pageNum,
+    $totalPages: context.totalPages,
   };
 
   // Merge order: Helpers > Data > RootData?

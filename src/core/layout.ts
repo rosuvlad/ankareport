@@ -11,7 +11,7 @@ export interface ILayout extends IStyle {
   footerSection: ISection;
   pageHeaderSection?: ISection;
   pageFooterSection?: ISection;
-  initialPageNumber?: number; // Default: 0
+  initialPageNumber?: number; // Default: 1
 }
 
 export interface ISection extends IStyle {

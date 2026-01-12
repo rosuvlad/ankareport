@@ -1,5 +1,6 @@
 import EventEmitter, { EventCallback } from "../../core/eventEmitter";
 import Textbox from "./editors/textbox";
+import DropdownList from "./editors/dropdownList";
 import { Property, PropertyEditor } from "./property";
 import "./propertyGridRow.css";
 
@@ -23,7 +24,19 @@ export default class PropertyGridRow {
     public readonly property: Property,
     private readonly value: string,
   ) {
-    this.editor = property.editor || new Textbox();
+    if (property.editor) {
+      this.editor = property.editor;
+    } else if (property.type === "boolean") {
+      this.editor = new DropdownList({
+        items: [
+          { value: "false", label: "False" },
+          { value: "true", label: "True" },
+        ],
+        defaultValue: "false",
+      });
+    } else {
+      this.editor = new Textbox();
+    }
 
     this._init();
   }

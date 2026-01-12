@@ -200,7 +200,7 @@ const layout = {
   // Page header/footer (appears on every PDF page)
   pageHeaderSection: { ... },
   pageFooterSection: { ... },
-  initialPageNumber: 0,                   // Start page numbering from this value (default: 0)
+  initialPageNumber: 1,                   // Start page numbering from this value (default: 1)
   
   // Report sections
   headerSection: { ... },
@@ -233,6 +233,34 @@ const layout = {
   groupFooter: { ... },
 }
 ```
+
+### Page Header/Footer Section
+
+Page headers and footers appear on every page in PDF export. They support special page numbering variables:
+
+```js
+pageHeaderSection: {
+  height: "auto",
+  binding: "",
+  visibleOnFirstPage: true,   // Show on first page (default: false)
+  visibleOnLastPage: true,    // Show on last page (default: false)
+  items: [
+    // Company name
+    { type: "text", x: 40, y: 5, width: 200, height: 18, binding: "company.name" },
+    
+    // Page numbering: "Page 1 / 5"
+    { type: "text", x: 470, y: 5, width: 30, height: 18, text: "Page" },
+    { type: "text", x: 500, y: 5, width: 15, height: 18, binding: "$pageNum" },
+    { type: "text", x: 515, y: 5, width: 10, height: 18, text: "/" },
+    { type: "text", x: 525, y: 5, width: 20, height: 18, binding: "$totalPages" },
+  ],
+}
+```
+
+**Visibility Rules:**
+- `visibleOnFirstPage: false` - Header/footer will NOT appear on page 1
+- `visibleOnLastPage: false` - Header/footer will NOT appear on the last page
+- Both default to `false`, so you must explicitly enable them
 
 ### Report Items
 

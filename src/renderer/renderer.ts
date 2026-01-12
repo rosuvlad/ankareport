@@ -106,7 +106,7 @@ export default class Renderer {
       // This means for 1 page doc, only visibleOnFirst matters. Correct?
       // Usually yes. "First Page" is the most specific state of Page 1.
 
-      const initialPage = this.options.layout.initialPageNumber ?? 0;
+      const initialPage = this.options.layout.initialPageNumber ?? 1;
 
       const pageHeaderSection = this.createPageSection(
         this.options.layout.pageHeaderSection,
@@ -186,7 +186,7 @@ export default class Renderer {
       else if (isLast && !visibleOnLast && !isFirst) shouldRender = false;
 
       if (shouldRender) {
-        const initialPage = this.options.layout.initialPageNumber ?? 0;
+        const initialPage = this.options.layout.initialPageNumber ?? 1;
 
         const pageFooterSection = this.createPageSection(
           this.options.layout.pageFooterSection,

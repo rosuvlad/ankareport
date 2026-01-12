@@ -121,7 +121,7 @@ export async function exportToPdf(layout: ILayout, data: any) {
       else if (isLastPage && !visibleOnLast && !isFirstPage) shouldRender = false;
 
       if (shouldRender) {
-        const initialPage = layout.initialPageNumber ?? 0;
+        const initialPage = layout.initialPageNumber ?? 1;
         const displayPageNum = pageNum + initialPage;
 
         const pageContext: ExpressionContext = {
@@ -156,7 +156,7 @@ export async function exportToPdf(layout: ILayout, data: any) {
 
       if (shouldRender) {
         // Calculate effective page number
-        const initialPage = layout.initialPageNumber ?? 0;
+        const initialPage = layout.initialPageNumber ?? 1;
         const displayPageNum = pageNum + initialPage;
 
         const pageContext: ExpressionContext = {

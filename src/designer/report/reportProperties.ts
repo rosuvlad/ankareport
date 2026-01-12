@@ -10,7 +10,7 @@ export default class ReportProperties extends StyleProperties {
   private _pageSize: PageSize | undefined = "A4";
   private _width: number | undefined;
   private _height: number | undefined;
-  private _initialPageNumber: number | undefined;
+  private _initialPageNumber: number | undefined = 1;
 
   get pageSize() {
     return this._pageSize;
@@ -24,7 +24,7 @@ export default class ReportProperties extends StyleProperties {
     return this._height;
   }
 
-  get initialPageNumber() {
+  get initialPageNumber(): number | undefined {
     return this._initialPageNumber;
   }
 

@@ -12,7 +12,11 @@
     "dev": "rollup -c -w",
     "build": "rollup -c",
     "prettier": "prettier --write .",
-    "test": "jest"
+    "test": "jest",
+    "api:dev": "npm run build && cd api && npm run dev",
+    "api:build": "npm run build && cd api && npm run build",
+    "api:start": "cd api && npm start",
+    "api:install": "cd api && npm install"
   },
   "dependencies": {
     "chart.js": "^4.5.1",

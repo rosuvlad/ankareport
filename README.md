@@ -69,8 +69,10 @@ Free & Open Source Web Reporting Tool with visual designer, data binding, and mu
 - Inherited styles from parent sections
 
 ### Export
+- **HTML** - Direct HTML rendering in browser
 - **PDF** - Multi-page support, page headers/footers, font support (Helvetica, Times, Courier with bold variants)
 - **Excel** - Cell-based export with styling, charts, and images
+- **REST API** - Server-side report generation API with Docker support (see [API Documentation](#rest-api))
 
 ### Designer
 - Visual drag-and-drop editor
@@ -608,6 +610,607 @@ Or use custom dimensions:
   height: 600,
 }
 ```
+
+## REST API
+
+AnkaReport includes a production-ready Express API server for server-side report generation. The API supports HTML, PDF, and Excel export formats using Playwright for headless browser rendering.
+
+### Features
+
+- ✅ **HTML Export** - Generate rendered HTML reports
+- ✅ **PDF Export** - Generate PDF reports from layouts
+- ✅ **Excel Export** - Generate Excel files with charts, barcodes, and QR codes
+- ✅ **Swagger Documentation** - Interactive API documentation at `/swagger`
+- ✅ **Health Check** - Monitor API health at `/health`
+- ✅ **Docker Support** - Multi-stage Dockerfile for optimized production images
+- ✅ **Error Handling** - Comprehensive error classification and handling
+- ✅ **Rate Limiting** - Configurable request rate limits
+- ✅ **Security** - Helmet.js security headers, CORS, input validation
+
+### Quick Start
+
+#### Using Docker (Recommended)
+
+```bash
+# Start the API server
+docker-compose up
+
+# The API will be available at http://localhost:3000
+# Swagger documentation: http://localhost:3000/swagger
+```
+
+#### Local Development
+
+```bash
+# Install dependencies
+npm run api:install
+
+# Build AnkaReport and start API in development mode
+npm run api:dev
+
+# Or build and start separately
+npm run api:build
+npm run api:start
+```
+
+### API Endpoints
+
+#### POST /api/v1/report-generator
+
+Generate report in HTML, PDF, or Excel format.
+
+**Query Parameters:**
+- `format` (required): `html`, `pdf`, or `excel`
+
+**Request Body:**
+```json
+{
+  "data": {
+    "company": { "name": "Example Corp" },
+    "departments": [
+      { "name": "Sales", "revenue": 100000 }
+    ]
+  },
+  "layout": {
+    "pageSize": "A4",
+    "headerSection": {
+      "items": [
+        { "type": "text", "x": 40, "y": 20, "width": 200, "height": 30, "binding": "company.name" }
+      ]
+    },
+    "contentSection": {
+      "binding": "departments",
+      "items": [
+        { "type": "text", "x": 40, "y": 60, "width": 150, "height": 20, "binding": "name" },
+        { "type": "text", "x": 200, "y": 60, "width": 100, "height": 20, "binding": "revenue", "format": "f2" }
+      ]
+    }
+  },
+  "filename": "report"
+}
+```
+
+**Response:**
+- HTML: `Content-Type: text/html`
+- PDF: `Content-Type: application/pdf`
+- Excel: `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+**Example using cURL:**
+```bash
+# Generate PDF
+curl -X POST "http://localhost:3000/api/v1/report-generator?format=pdf" \
+  -H "Content-Type: application/json" \
+  -d '{"data": {...}, "layout": {...}, "filename": "report"}' \
+  --output report.pdf
+
+# Generate Excel
+curl -X POST "http://localhost:3000/api/v1/report-generator?format=excel" \
+  -H "Content-Type: application/json" \
+  -d '{"data": {...}, "layout": {...}, "filename": "report"}' \
+  --output report.xlsx
+
+# Generate HTML
+curl -X POST "http://localhost:3000/api/v1/report-generator?format=html" \
+  -H "Content-Type: application/json" \
+  -d '{"data": {...}, "layout": {...}, "filename": "report"}' \
+  --output report.html
+```
+
+#### GET /health
+
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "browser": "connected",
+  "uptime": 12345
+}
+```
+
+#### GET /swagger
+
+Interactive API documentation with Swagger UI.
+
+### Environment Variables
+
+Create `api/.env` file for configuration:
+
+```env
+PORT=3000
+NODE_ENV=production
+MAX_REQUEST_SIZE=50mb
+REQUEST_TIMEOUT_MS=120000
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW_MS=900000
+MAX_CONCURRENT_PAGES=10
+BASE_URL=http://localhost:3000
+ALLOWED_ORIGINS=*
+NODE_OPTIONS=--max-old-space-size=4096
+
+# Temporary file storage configuration
+TEMP_DIR=tmp/ankareport-data
+TEMP_CLEANUP_DELAY_MS=300000
+TEMP_MAX_AGE_MS=3600000
+CLEANUP_INTERVAL_MS=1800000
+```
+
+**Configuration Options:**
+
+**Server Configuration:**
+- `PORT` - Server port (default: 3000)
+- `MAX_REQUEST_SIZE` - Maximum request body size (default: 50mb)
+- `REQUEST_TIMEOUT_MS` - Request timeout in milliseconds (default: 120000 = 2 minutes)
+- `RATE_LIMIT_MAX` - Maximum requests per window (default: 100)
+- `RATE_LIMIT_WINDOW_MS` - Rate limit window in milliseconds (default: 900000 = 15 minutes)
+- `MAX_CONCURRENT_PAGES` - Maximum concurrent Playwright pages (default: 10)
+- `BASE_URL` - Base URL for asset serving (default: http://localhost:PORT)
+- `ALLOWED_ORIGINS` - CORS allowed origins (default: *)
+
+**Temporary File Storage Configuration:**
+- `TEMP_DIR` - Directory for temporary files (default: `tmp/ankareport-data`)
+- `TEMP_CLEANUP_DELAY_MS` - Backup cleanup delay in milliseconds (default: 300000 = 5 minutes)
+- `TEMP_MAX_AGE_MS` - Stale file age threshold in milliseconds (default: 3600000 = 1 hour)
+- `CLEANUP_INTERVAL_MS` - Periodic cleanup interval in milliseconds (default: 1800000 = 30 minutes)
+
+### Docker Deployment
+
+#### Build Docker Image
+
+```bash
+docker build -t ankareport-api .
+```
+
+#### Run Container
+
+```bash
+docker run -p 3000:3000 ankareport-api
+```
+
+#### Docker Compose
+
+```bash
+# Start service
+docker-compose up
+
+# Start in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop service
+docker-compose down
+```
+
+### Architecture
+
+The API server is built with a modern, production-ready architecture designed for reliability, performance, and scalability.
+
+#### System Overview
+
+The API consists of several key components working together:
+
+1. **Express HTTP Server** - Main API server handling HTTP requests
+2. **Playwright Browser Instance** - Singleton Chromium browser for rendering
+3. **Internal Server** - Localhost-only server for secure data access
+4. **Temporary File Storage** - Filesystem-based storage for large payloads
+5. **Static Asset Serving** - Serves AnkaReport JS/CSS bundles
+
+#### System Architecture Diagram
+
+```mermaid
+graph TB
+    Client[Client Application] -->|HTTP POST| Express[Express API Server]
+    Express -->|Rate Limiting| RateLimiter[Rate Limiter]
+    Express -->|Validation| Validator[Request Validator]
+    Express -->|Timeout| TimeoutMiddleware[Timeout Middleware]
+    
+    Express -->|Get Browser| BrowserManager[Browser Manager]
+    BrowserManager -->|Singleton| PlaywrightBrowser[Playwright Browser Instance]
+    BrowserManager -->|Create Page| PlaywrightPage[Playwright Page]
+    
+    Express -->|Static Assets| StaticAssets[Static Asset Server<br/>/assets/ankareport.js<br/>/assets/ankareport.css]
+    
+    Express -->|Large Payloads| TempStorage[Temporary File Storage]
+    TempStorage -->|Store| FileSystem[(FileSystem<br/>tmp/ankareport-data)]
+    
+    TempStorage -->|Serve Data| InternalServer[Internal Server<br/>127.0.0.1:30000+]
+    InternalServer -->|Stream JSON| PlaywrightPage
+    
+    PlaywrightPage -->|Load Template| HTMLTemplate[index.html Template]
+    HTMLTemplate -->|Load Assets| StaticAssets
+    HTMLTemplate -->|Fetch Data| InternalServer
+    
+    PlaywrightPage -->|Render| AnkaReport[AnkaReport Library]
+    AnkaReport -->|Export| ExportFormat{Export Format}
+    ExportFormat -->|HTML| HTMLOutput[HTML Output]
+    ExportFormat -->|PDF| PDFOutput[PDF Output]
+    ExportFormat -->|Excel| ExcelOutput[Excel Output]
+    
+    Express -->|Response| Client
+    
+    CleanupScheduler[Cleanup Scheduler] -->|Startup| CleanupStale[Cleanup Stale Files]
+    CleanupScheduler -->|Periodic| CleanupStale
+    CleanupScheduler -->|After Request| CleanupImmediate[Immediate Cleanup]
+    CleanupScheduler -->|Backup| CleanupBackup[Backup Cleanup]
+    CleanupStale --> FileSystem
+    CleanupImmediate --> FileSystem
+    CleanupBackup --> FileSystem
+    
+    style Express fill:#4A90E2
+    style PlaywrightBrowser fill:#50C878
+    style InternalServer fill:#FF6B6B
+    style TempStorage fill:#FFD93D
+    style FileSystem fill:#6C757D
+```
+
+#### Request Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Express
+    participant RateLimiter
+    participant Validator
+    participant BrowserManager
+    participant PlaywrightPage
+    participant StaticAssets
+    participant AnkaReport
+    participant TempStorage
+    participant InternalServer
+    participant FileSystem
+    
+    Client->>Express: POST /api/v1/report-generator?format=pdf
+    Express->>RateLimiter: Check rate limit
+    RateLimiter-->>Express: Allowed
+    Express->>Validator: Validate request
+    Validator-->>Express: Valid
+    
+    alt Large Payload
+        Express->>TempStorage: Store layout/data
+        TempStorage->>FileSystem: Write JSON files (streaming)
+        TempStorage-->>Express: Return GUID + cleanup function
+    end
+    
+    Express->>BrowserManager: Get browser instance
+    BrowserManager->>BrowserManager: Check if connected
+    alt Browser disconnected
+        BrowserManager->>BrowserManager: Launch new browser
+    end
+    BrowserManager-->>Express: Browser instance
+    
+    Express->>BrowserManager: Create page (check concurrency)
+    BrowserManager->>PlaywrightPage: Create new page
+    BrowserManager->>PlaywrightPage: Setup error listeners
+    BrowserManager-->>Express: Page + errors array
+    
+    Express->>PlaywrightPage: Set content (HTML template)
+    PlaywrightPage->>StaticAssets: Load ankareport.js/css
+    StaticAssets-->>PlaywrightPage: Assets loaded
+    
+    alt Large Payload
+        PlaywrightPage->>InternalServer: GET /layout/:guid
+        InternalServer->>FileSystem: Stream layout.json
+        FileSystem-->>InternalServer: JSON data
+        InternalServer-->>PlaywrightPage: Layout JSON (streamed)
+        
+        PlaywrightPage->>InternalServer: GET /data/:guid
+        InternalServer->>FileSystem: Stream data.json
+        FileSystem-->>InternalServer: JSON data
+        InternalServer-->>PlaywrightPage: Data JSON (streamed)
+    else Small Payload
+        Note over PlaywrightPage: Data injected inline<br/>in HTML template
+    end
+    
+    PlaywrightPage->>AnkaReport: Initialize renderer
+    AnkaReport->>AnkaReport: Render report
+    
+    alt Format = HTML
+        AnkaReport-->>PlaywrightPage: Rendered HTML
+        PlaywrightPage-->>Express: HTML content
+    else Format = PDF
+        AnkaReport-->>PlaywrightPage: Rendered HTML
+        PlaywrightPage->>PlaywrightPage: Generate PDF
+        PlaywrightPage-->>Express: PDF buffer
+    else Format = Excel
+        AnkaReport->>AnkaReport: Generate Excel (browser context)
+        AnkaReport-->>PlaywrightPage: Excel buffer (base64)
+        PlaywrightPage-->>Express: Excel buffer
+    end
+    
+    Express->>PlaywrightPage: Close page
+    Express->>TempStorage: Cleanup temp files (if used)
+    TempStorage->>FileSystem: Delete files
+    
+    Express-->>Client: Response (HTML/PDF/Excel)
+```
+
+#### Large Payload Handling Flow
+
+```mermaid
+graph LR
+    A[Large JSON Payload<br/>Received] -->|Stream to FS| B[Temporary File Storage]
+    B -->|Generate GUID| C[GUID: uuid-v4]
+    B -->|Write Files| D[FileSystem<br/>tmp/ankareport-data/GUID/<br/>  layout.json<br/>  data.json]
+    
+    C -->|Return GUID| E[Express Handler]
+    E -->|Inject GUID| F[HTML Template<br/>window.__ANKAREPORT_DATA_GUID__]
+    
+    F -->|Load in Browser| G[Playwright Page]
+    G -->|Fetch via GUID| H[Internal Server<br/>127.0.0.1:30000+]
+    H -->|GET /layout/:guid| I[Stream layout.json]
+    H -->|GET /data/:guid| J[Stream data.json]
+    
+    I -->|Stream| G
+    J -->|Stream| G
+    
+    G -->|Parse JSON| K[AnkaReport Renderer]
+    
+    E -->|After Response| L[Cleanup Function]
+    L -->|Delete Files| D
+    
+    M[Periodic Cleanup<br/>Every 30 min] -->|Clean Stale Files| D
+    N[Startup Cleanup] -->|Clean Stale Files| D
+    O[Backup Cleanup<br/>After 5 min] -->|Clean Files| D
+    
+    style B fill:#FFD93D
+    style H fill:#FF6B6B
+    style D fill:#6C757D
+    style G fill:#50C878
+```
+
+#### Cleanup Mechanisms Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> TempFileCreated: Store Report Data
+    
+    TempFileCreated --> ImmediateCleanup: After Request Completion
+    TempFileCreated --> BackupCleanup: After 5 minutes (backup)
+    TempFileCreated --> StartupCleanup: On Server Start
+    TempFileCreated --> PeriodicCleanup: Every 30 minutes
+    
+    ImmediateCleanup --> FileDeleted: Success
+    ImmediateCleanup --> BackupCleanup: If Failed
+    BackupCleanup --> FileDeleted: Success
+    StartupCleanup --> FileDeleted: Files older than 1 hour
+    PeriodicCleanup --> FileDeleted: Files older than 1 hour
+    
+    FileDeleted --> [*]
+    
+    note right of TempFileCreated
+        File created in:
+        tmp/ankareport-data/GUID/
+          layout.json
+          data.json
+    end note
+    
+    note right of ImmediateCleanup
+        Called in finally block
+        after request completion
+    end note
+    
+    note right of BackupCleanup
+        setTimeout-based
+        Safety net if immediate
+        cleanup fails
+    end note
+    
+    note right of StartupCleanup
+        Runs on server startup
+        Removes stale files
+        (older than TEMP_MAX_AGE_MS)
+    end note
+    
+    note right of PeriodicCleanup
+        Scheduled cleanup
+        Runs every CLEANUP_INTERVAL_MS
+        Removes stale files
+    end note
+```
+
+#### Component Details
+
+**1. Express API Server (`api/server.ts`)**
+- Main HTTP server handling all API requests
+- Middleware stack: Helmet (security), CORS, rate limiting, request timeout
+- Route handlers for report generation, health checks, and Swagger
+- Error handling middleware with custom error classes
+- Graceful shutdown with resource cleanup
+
+**2. Playwright Browser Manager**
+- **Singleton Pattern**: Single browser instance shared across all requests
+- **Page Isolation**: Each request gets its own Playwright page
+- **Concurrency Control**: Atomic page creation with configurable limit
+- **Error Handling**: Comprehensive error listeners (pageerror, console, crash)
+- **Crash Recovery**: Automatic browser restart on disconnect
+
+**3. Internal Server (`api/utils/internal-server.ts`)**
+- Separate Express server bound to `127.0.0.1` only (localhost)
+- Not accessible externally (security)
+- Automatically finds available port (starting from 30000)
+- Endpoints:
+  - `GET /layout/:guid` - Streams layout JSON file
+  - `GET /data/:guid` - Streams data JSON file
+- Integrated with main server lifecycle (starts/stops together)
+
+**4. Temporary File Storage (`api/utils/temp-storage.ts`)**
+- Stores large JSON payloads in filesystem
+- Uses GUID (UUID v4) for file identification
+- Streaming support for efficient I/O
+- Multiple cleanup mechanisms:
+  - **Immediate**: After request completion (when integrated)
+  - **Backup**: Timeout-based (5 minutes default)
+  - **Startup**: Removes stale files on server start
+  - **Periodic**: Scheduled cleanup every 30 minutes (default)
+
+**5. Static Asset Serving**
+- Serves AnkaReport JS/CSS from `api/public/libs/`
+- HTTP caching headers (1 year cache)
+- Template (`index.html`) cached in memory
+- Works in both local and Docker environments
+
+#### Export Format Details
+
+**HTML Export:**
+1. Load `index.html` template
+2. Inject layout/data (inline for small payloads, GUID for large)
+3. Load AnkaReport library from static assets
+4. Initialize renderer in browser context
+5. Extract rendered HTML from DOM
+6. Return HTML string
+
+**PDF Export:**
+1. Same as HTML export (steps 1-4)
+2. Use Playwright's native `page.pdf()` method
+3. Configure PDF options (page size, margins, etc.)
+4. Return PDF buffer
+
+**Excel Export:**
+1. Load `index.html` template
+2. Inject layout/data
+3. Load AnkaReport library
+4. Execute `AnkaReport.exportToXlsx()` in browser context
+5. Convert Excel buffer to base64 (chunked to avoid stack overflow)
+6. Return Excel buffer
+
+#### Error Handling Architecture
+
+```mermaid
+graph TD
+    A[Request Received] -->|Error Occurs| B{Error Type}
+    
+    B -->|Validation| C[ValidationError<br/>400 Bad Request]
+    B -->|Timeout| D[TimeoutError<br/>504 Gateway Timeout]
+    B -->|Concurrency Limit| E[ServiceUnavailableError<br/>503 Service Unavailable]
+    B -->|Render Error| F[RenderError<br/>500 Internal Server Error]
+    B -->|Excel Error| G[ExcelGenerationError<br/>500 Internal Server Error]
+    B -->|Other| H[InternalError<br/>500 Internal Server Error]
+    
+    C --> I[Error Handler Middleware]
+    D --> I
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    
+    I -->|classifyError| J{Is ApiError?}
+    J -->|Yes| K[Use error.code<br/>error.statusCode]
+    J -->|No| L[Classify by message/name]
+    L --> K
+    
+    K -->|Format Response| M[JSON Error Response<br/>code: ERROR_CODE<br/>message: Error message<br/>details: Stack trace - dev only]
+    
+    M -->|Send| N[Client]
+    
+    style C fill:#FFE66D
+    style D fill:#FF6B6B
+    style E fill:#FF6B6B
+    style F fill:#FF6B6B
+    style G fill:#FF6B6B
+    style H fill:#FF6B6B
+    style I fill:#4ECDC4
+    style J fill:#95E1D3
+    style K fill:#95E1D3
+    style L fill:#95E1D3
+```
+
+#### Performance Optimizations
+
+1. **Browser Instance Reuse**
+   - Single browser instance shared across requests
+   - Reduces memory usage and startup time
+   - Pages are isolated per request
+
+2. **Asset Caching**
+   - HTML template cached in memory
+   - Static assets served with HTTP cache headers
+   - Reduces disk I/O
+
+3. **Streaming I/O**
+   - Large JSON files streamed to/from filesystem
+   - Reduces memory usage for large payloads
+   - Non-blocking operations
+
+4. **Concurrency Control**
+   - Atomic page creation prevents race conditions
+   - Configurable limit prevents resource exhaustion
+   - Proper cleanup ensures resources are released
+
+5. **Efficient Export Methods**
+   - PDF: Native Playwright (no external libraries)
+   - Excel: Browser context (leverages bundled libraries)
+   - HTML: Direct DOM extraction
+
+### Performance
+
+- **Browser Instance Reuse** - Single browser instance shared across requests
+- **Isolated Pages** - Each request gets its own Playwright page
+- **Concurrency Control** - Configurable limit on concurrent pages
+- **Asset Caching** - Template and static assets cached in memory
+- **Efficient Export** - Native Playwright PDF generation, browser-based Excel generation
+
+### Security
+
+- **Helmet.js** - Security headers (CSP, XSS protection, etc.)
+- **CORS** - Configurable cross-origin resource sharing
+- **Rate Limiting** - Prevents abuse
+- **Input Validation** - Request body and parameter validation
+- **Filename Sanitization** - Prevents path traversal attacks
+- **Resource Limits** - Request size and concurrency limits
+
+### Error Handling
+
+The API uses custom error classes for better error classification:
+
+- `ValidationError` (400) - Invalid input
+- `TimeoutError` (504) - Request timeout
+- `ServiceUnavailableError` (503) - Service unavailable
+- `RenderError` (500) - Rendering errors
+- `ExcelGenerationError` (500) - Excel generation errors
+- `InternalError` (500) - Internal server errors
+
+Error responses follow this format:
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Missing required fields: data and layout are required",
+    "details": "..." // Only in development mode
+  }
+}
+```
+
+### Limitations & Considerations
+
+- **Large Payloads** - The API supports large JSON payloads (configurable via `MAX_REQUEST_SIZE`), but very large payloads may impact performance
+- **Concurrency** - Limited by `MAX_CONCURRENT_PAGES` (default: 10)
+- **Memory Usage** - Playwright browser instances consume memory; adjust Docker memory limits as needed
+- **Timeout** - Requests exceeding `REQUEST_TIMEOUT_MS` will be aborted
+
+For more details, see [api/README.md](api/README.md).
 
 ## Contributing
 

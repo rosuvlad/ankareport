@@ -1,6 +1,6 @@
 import { Property } from "../../components/propertyGrid/property";
 import StyleProperties from "../../core/styleProperties";
-import { PageSize, SupportedOutputs } from "../../core/layout";
+import { PageSize, PageOrientation, SupportedOutputs } from "../../core/layout";
 import { resolvePageDimensions, getAvailablePageSizes } from "../../core/utils/pageSize";
 import DropdownList from "../../components/propertyGrid/editors/dropdownList";
 
@@ -8,6 +8,7 @@ const MIN_REPORT_WIDTH = 100;
 
 export default class ReportProperties extends StyleProperties {
   private _pageSize: PageSize | undefined = "A4";
+  private _orientation: PageOrientation = "portrait";
   private _width: number | undefined;
   private _height: number | undefined;
   private _initialPageNumber: number | undefined = 1;
@@ -15,6 +16,10 @@ export default class ReportProperties extends StyleProperties {
 
   get pageSize() {
     return this._pageSize;
+  }
+
+  get orientation(): PageOrientation {
+    return this._orientation;
   }
 
   get width() {
@@ -42,6 +47,12 @@ export default class ReportProperties extends StyleProperties {
       this._height = undefined;
     }
     this.emitOnChange("pageSize", value, oldValue);
+  }
+
+  set orientation(value: PageOrientation) {
+    const oldValue = this._orientation;
+    this._orientation = value || "portrait";
+    this.emitOnChange("orientation", this._orientation, oldValue);
   }
 
   set width(value: number | string | undefined) {
@@ -100,6 +111,11 @@ export default class ReportProperties extends StyleProperties {
       { value: "EXCEL", label: "Excel Only" },
     ];
 
+    const orientationItems = [
+      { value: "portrait", label: "Portrait" },
+      { value: "landscape", label: "Landscape" },
+    ];
+
     return [
       {
         field: "pageSize",
@@ -108,6 +124,15 @@ export default class ReportProperties extends StyleProperties {
         editor: new DropdownList({
           items: pageSizeItems,
           defaultValue: "A4",
+        }),
+      },
+      {
+        field: "orientation",
+        label: "Orientation",
+        type: "string",
+        editor: new DropdownList({
+          items: orientationItems,
+          defaultValue: "portrait",
         }),
       },
       { field: "width", label: "Width", type: "string" },

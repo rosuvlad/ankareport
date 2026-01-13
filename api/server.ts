@@ -168,10 +168,19 @@ const PAGE_SIZES: Record<string, { width: number; height: number }> = {
  */
 async function setViewportFromLayout(page: Page, layout: any): Promise<{ width: number; height: number }> {
   const pageSize = layout.pageSize || 'A4';
+  const orientation = layout.orientation || 'portrait';
   const baseDimensions = PAGE_SIZES[pageSize] || PAGE_SIZES['A4'];
 
-  const width = layout.width ?? baseDimensions.width;
-  const height = layout.height ?? baseDimensions.height;
+  // Swap width and height for landscape orientation
+  let baseWidth = baseDimensions.width;
+  let baseHeight = baseDimensions.height;
+  if (orientation === 'landscape') {
+    baseWidth = baseDimensions.height;
+    baseHeight = baseDimensions.width;
+  }
+
+  const width = layout.width ?? baseWidth;
+  const height = layout.height ?? baseHeight;
 
   await page.setViewportSize({ width, height });
   return { width, height };

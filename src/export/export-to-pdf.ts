@@ -54,6 +54,37 @@ function getFont(fonts: FontCache, fontFamily?: string, fontWeight?: string): PD
   return isBold ? fonts['Helvetica-Bold'] : fonts['Helvetica'];
 }
 
+/**
+ * Determines if a page section (header/footer) should be rendered on a given page.
+ * 
+ * Visibility Logic:
+ * - visibleOnFirstPage: Controls visibility on the first page (default: false)
+ * - visibleOnLastPage: Controls visibility on the last page (default: false)
+ * - For middle pages (not first, not last): Always visible
+ * - For single-page documents: Must have visibleOnFirstPage=true to show
+ * 
+ * @param section - The page section configuration
+ * @param isFirstPage - Whether this is the first page
+ * @param isLastPage - Whether this is the last page
+ * @returns true if the section should be rendered
+ */
+function shouldRenderPageSection(
+  section: ISection,
+  isFirstPage: boolean,
+  isLastPage: boolean
+): boolean {
+  const visibleOnFirst = section.visibleOnFirstPage ?? false;
+  const visibleOnLast = section.visibleOnLastPage ?? false;
+
+  // First page check takes precedence
+  if (isFirstPage && !visibleOnFirst) return false;
+  
+  // Last page check (only if not first page, to avoid double-checking single-page docs)
+  if (isLastPage && !isFirstPage && !visibleOnLast) return false;
+
+  return true;
+}
+
 export async function exportToPdf(layout: ILayout, data: any) {
   // Clear image cache for fresh export
   imageCache.clear();
@@ -65,7 +96,8 @@ export async function exportToPdf(layout: ILayout, data: any) {
   const { width: pageWidthPx, height: pageHeightPx } = resolvePageDimensions(
     layout.pageSize,
     layout.width,
-    layout.height
+    layout.height,
+    layout.orientation
   );
 
   // Convert page dimensions to points
@@ -109,16 +141,12 @@ export async function exportToPdf(layout: ILayout, data: any) {
     await renderItems(currentPage, pageData.items, pageHeight, pageData.yOffset, fonts, doc);
 
     // Render page header (if defined)
-    // Render page header (if defined)
     if (layout.pageHeaderSection) {
-      const isFirstPage = pageNum === 0;
-      const isLastPage = pageNum === totalPages - 1;
-      const visibleOnFirst = layout.pageHeaderSection.visibleOnFirstPage ?? false;
-      const visibleOnLast = layout.pageHeaderSection.visibleOnLastPage ?? false;
-
-      let shouldRender = true;
-      if (isFirstPage && !visibleOnFirst) shouldRender = false;
-      else if (isLastPage && !visibleOnLast && !isFirstPage) shouldRender = false;
+      const shouldRender = shouldRenderPageSection(
+        layout.pageHeaderSection,
+        pageNum === 0,
+        pageNum === totalPages - 1
+      );
 
       if (shouldRender) {
         const initialPage = layout.initialPageNumber ?? 1;
@@ -127,6 +155,7 @@ export async function exportToPdf(layout: ILayout, data: any) {
         const pageContext: ExpressionContext = {
           data,
           rootData: data,
+          contextData: data?.context,
           pageNum: displayPageNum,
           totalPages,
         };
@@ -143,16 +172,12 @@ export async function exportToPdf(layout: ILayout, data: any) {
     }
 
     // Render page footer (if defined)
-    // Render page footer (if defined)
     if (layout.pageFooterSection) {
-      const isFirstPage = pageNum === 0;
-      const isLastPage = pageNum === totalPages - 1;
-      const visibleOnFirst = layout.pageFooterSection.visibleOnFirstPage ?? false;
-      const visibleOnLast = layout.pageFooterSection.visibleOnLastPage ?? false;
-
-      let shouldRender = true;
-      if (isFirstPage && !visibleOnFirst) shouldRender = false;
-      else if (isLastPage && !visibleOnLast && !isFirstPage) shouldRender = false;
+      const shouldRender = shouldRenderPageSection(
+        layout.pageFooterSection,
+        pageNum === 0,
+        pageNum === totalPages - 1
+      );
 
       if (shouldRender) {
         // Calculate effective page number
@@ -162,6 +187,7 @@ export async function exportToPdf(layout: ILayout, data: any) {
         const pageContext: ExpressionContext = {
           data,
           rootData: data,
+          contextData: data?.context,
           pageNum: displayPageNum,
           totalPages,
         };

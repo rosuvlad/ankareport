@@ -41,8 +41,9 @@ export function generateItemsWithSections(layout: ILayout, data: any, genContext
   });
 
   // Content section
-  if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
-    let contentArray = data[layout.contentSection.binding];
+  const contentData = resolveSectionData(layout.contentSection.binding, data);
+  if (layout.contentSection.binding && contentData && Array.isArray(contentData)) {
+    let contentArray = contentData;
     const keepTogether = layout.contentSection.keepTogether ?? false;
 
     // Apply sorting
@@ -185,8 +186,9 @@ export function generateItems(layout: ILayout, data: any, genContext?: GenerateC
   topMargin += headerElements.height;
   items.push(...headerElements.items);
 
-  if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
-    let contentArray = data[layout.contentSection.binding];
+  const contentData = resolveSectionData(layout.contentSection.binding, data);
+  if (layout.contentSection.binding && contentData && Array.isArray(contentData)) {
+    let contentArray = contentData;
 
     // Apply sorting
     if (layout.contentSection.orderBy) {
@@ -293,7 +295,7 @@ function processGroupedContent(topMargin: number, section: ISection, dataArray: 
 
 function resolveSectionData(binding: string, data: any): any {
   if (!binding || !data) return data;
-  const context: ExpressionContext = { data };
+  const context: ExpressionContext = { data, rootData: data, contextData: data?.context };
   const result = evaluateExpression(binding, context);
   return result ?? data;
 }
@@ -324,9 +326,11 @@ function calculateAutoHeight(section: ISection): number {
 function getSectionItems(topMargin: number, section: ISection, data: any, index?: number, sectionContext?: SectionContext) {
   let height = section.height === "auto" ? 0 : section.height;
 
+  const rootData = sectionContext?.rootData ?? data;
   const context: ExpressionContext = {
     data,
-    rootData: sectionContext?.rootData ?? data,
+    rootData: rootData,
+    contextData: rootData?.context,  // Pass context object explicitly for context() function
     index,
     pageNum: sectionContext?.pageNum,
     totalPages: sectionContext?.totalPages,
@@ -505,7 +509,7 @@ function getSectionItems(topMargin: number, section: ISection, data: any, index?
 
   if (section.sections) {
     for (const subSection of section.sections) {
-      let subData = subSection.binding && data ? data[subSection.binding] : null;
+      let subData = subSection.binding ? resolveSectionData(subSection.binding, data) : null;
       if (Array.isArray(subData)) {
         // Apply sorting to subsection data
         if (subSection.orderBy) {

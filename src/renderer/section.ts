@@ -34,9 +34,11 @@ export default class Section {
     private readonly index?: number,
     private readonly options: SectionOptions = {},
   ) {
+    const rootData = this.options.rootData ?? this.data;
     this.context = {
       data: this.data,
-      rootData: this.options.rootData ?? this.data,
+      rootData: rootData,
+      contextData: rootData?.context,  // Pass context object explicitly for context() function
       index: this.index,
       pageNum: this.options.pageNum,
       totalPages: this.options.totalPages,
@@ -167,7 +169,7 @@ export default class Section {
     });
 
     this.layout.sections?.forEach((sectionLayout) => {
-      let subDataSource = this.data ? this.data[sectionLayout.binding] : {};
+      let subDataSource = sectionLayout.binding ? this.evaluateBinding(sectionLayout.binding) : this.data;
 
       if (Array.isArray(subDataSource)) {
         if (sectionLayout.orderBy) {

@@ -242,7 +242,63 @@ describe('Expression Evaluator - Context Variables ($)', () => {
   });
 });
 
-describe('Expression Evaluator - var() JSONPath Function', () => {
+describe('Expression Evaluator - $.property Syntax', () => {
+  const context: ExpressionContext = {
+    data: {
+      price: 25,
+      quantity: 4,
+      firstName: 'John',
+      lastName: 'Doe',
+      active: true,
+      items: [
+        { name: 'Item 1', amount: 100 },
+        { name: 'Item 2', amount: 200 },
+      ],
+    },
+    rootData: {},
+  };
+  context.rootData = context.data;
+
+  test('$.property access', () => {
+    expect(evaluateExpression('$.price', context)).toBe(25);
+    expect(evaluateExpression('$.quantity', context)).toBe(4);
+    expect(evaluateExpression('$.firstName', context)).toBe('John');
+  });
+
+  test('$.property arithmetic', () => {
+    expect(evaluateExpression('$.price * $.quantity', context)).toBe(100);
+    expect(evaluateExpression('$.price + $.quantity', context)).toBe(29);
+    expect(evaluateExpression('$.price - $.quantity', context)).toBe(21);
+  });
+
+  test('$.property string concatenation', () => {
+    expect(evaluateExpression("$.firstName + ' ' + $.lastName", context)).toBe('John Doe');
+  });
+
+  test('$.property ternary', () => {
+    expect(evaluateExpression("$.active ? 'Yes' : 'No'", context)).toBe('Yes');
+  });
+
+  test('$.property array access', () => {
+    expect(evaluateExpression('$.items[0].name', context)).toBe('Item 1');
+    expect(evaluateExpression('$.items[1].amount', context)).toBe(200);
+  });
+
+  test('$.property with array methods', () => {
+    expect(evaluateExpression('$.items.map(x => x.amount)', context)).toEqual([100, 200]);
+    expect(evaluateExpression('sum($.items.map(x => x.amount))', context)).toBe(300);
+  });
+
+  test('$.property mixed with scope variables', () => {
+    const ctxWithIndex: ExpressionContext = {
+      ...context,
+      index: 5,
+    };
+    expect(evaluateExpression('$rowNum + ". " + $.firstName', ctxWithIndex)).toBe('6. John');
+  });
+});
+
+describe('Expression Evaluator - root() JSONPath Function', () => {
   const context: ExpressionContext = {
     data: {
       store: {
@@ -267,36 +323,168 @@ describe('Expression Evaluator - var() JSONPath Function', () => {
   };
   context.rootData = context.data;
 
-  test('var() with simple path', () => {
-    expect(evaluateExpression("var('$.store.name')", context)).toBe('My Store');
+  test('root() with simple path', () => {
+    expect(evaluateExpression("root('$.store.name')", context)).toBe('My Store');
   });
 
-  test('var() with array index', () => {
-    expect(evaluateExpression("var('$.store.books[0].title')", context)).toBe('Book 1');
-    expect(evaluateExpression("var('$.store.books[1].price')", context)).toBe(20);
+  test('root() with array index', () => {
+    expect(evaluateExpression("root('$.store.books[0].title')", context)).toBe('Book 1');
+    expect(evaluateExpression("root('$.store.books[1].price')", context)).toBe(20);
   });
 
-  test('var() with array wildcard', () => {
-    expect(evaluateExpression("var('$.store.books[*].title')", context)).toEqual(['Book 1', 'Book 2', 'Book 3']);
-    expect(evaluateExpression("var('$.store.books[*].price')", context)).toEqual([10, 20, 15]);
+  test('root() with array wildcard', () => {
+    expect(evaluateExpression("root('$.store.books[*].title')", context)).toEqual(['Book 1', 'Book 2', 'Book 3']);
+    expect(evaluateExpression("root('$.store.books[*].price')", context)).toEqual([10, 20, 15]);
   });
 
-  test('var() with filter expression', () => {
-    const result = evaluateExpression("var('$.store.books[?(@.price > 12)]')", context);
+  test('root() with filter expression', () => {
+    const result = evaluateExpression("root('$.store.books[?(@.price > 12)]')", context);
     expect(result).toHaveLength(2);
   });
 
-  test('var() with recursive descent', () => {
-    expect(evaluateExpression("var('$..price')", context)).toEqual([10, 20, 15]);
+  test('root() with recursive descent', () => {
+    expect(evaluateExpression("root('$..price')", context)).toEqual([10, 20, 15]);
   });
 
-  test('var() for localization context', () => {
-    expect(evaluateExpression("var('$.context.localization.localeCode')", context)).toBe('en-US');
+  test('root() for localization context', () => {
+    expect(evaluateExpression("root('$.context.localization.localeCode')", context)).toBe('en-US');
   });
 
-  test('var() combined with other expressions', () => {
-    expect(evaluateExpression("var('$.store.name') + ' - Open'", context)).toBe('My Store - Open');
-    expect(evaluateExpression("sum(var('$.store.books[*].price'))", context)).toBe(45);
+  test('root() combined with other expressions', () => {
+    expect(evaluateExpression("root('$.store.name') + ' - Open'", context)).toBe('My Store - Open');
+    expect(evaluateExpression("sum(root('$.store.books[*].price'))", context)).toBe(45);
+  });
+});
+
+describe('Expression Evaluator - context() Function', () => {
+  test('context() accesses root.context object', () => {
+    const context: ExpressionContext = {
+      data: {
+        name: 'Current Item',
+      },
+      rootData: {
+        companyName: 'Acme Corp',
+        context: {
+          localization: {
+            localeCode: 'en-US',
+            resources: {
+              'en-US': { greeting: 'Hello' },
+              'es-ES': { greeting: 'Hola' },
+            },
+          },
+          temporal: {
+            nowUtc: '2024-01-15T10:30:00Z',
+            timeZoneId: 'America/New_York',
+          },
+          settings: {
+            currency: 'USD',
+            dateFormat: 'MM/dd/yyyy',
+          },
+        },
+      },
+    };
+
+    // context() accesses root.context object
+    expect(evaluateExpression("context('$.localization.localeCode')", context)).toBe('en-US');
+    expect(evaluateExpression("context('$.temporal.nowUtc')", context)).toBe('2024-01-15T10:30:00Z');
+    expect(evaluateExpression("context('$.temporal.timeZoneId')", context)).toBe('America/New_York');
+    expect(evaluateExpression("context('$.settings.currency')", context)).toBe('USD');
+  });
+
+  test('context() with advanced JSONPath on context object', () => {
+    const context: ExpressionContext = {
+      data: { name: 'Test' },
+      rootData: {
+        context: {
+          localization: {
+            defaultLocale: 'en',
+            greeting: 'Hello',
+          },
+          features: [
+            { name: 'feature1', enabled: true },
+            { name: 'feature2', enabled: false },
+            { name: 'feature3', enabled: true },
+          ],
+        },
+      },
+    };
+
+    // Access nested properties
+    expect(evaluateExpression("context('$.localization.greeting')", context)).toBe('Hello');
+    
+    // Wildcard on context features
+    expect(evaluateExpression("context('$.features[*].name')", context)).toEqual(['feature1', 'feature2', 'feature3']);
+    
+    // Filter enabled features
+    const enabledFeatures = evaluateExpression("context('$.features[?(@.enabled == true)]')", context);
+    expect(enabledFeatures).toHaveLength(2);
+  });
+
+  test('var() accesses root data, context() accesses root.context', () => {
+    const ctx: ExpressionContext = {
+      data: { name: 'Item' },
+      rootData: {
+        companyName: 'Acme Corp',
+        departments: [{ name: 'Sales' }, { name: 'Engineering' }],
+        context: {
+          locale: 'en-US',
+        },
+      },
+    };
+
+    // root() accesses root data
+    expect(evaluateExpression("root('$.companyName')", ctx)).toBe('Acme Corp');
+    expect(evaluateExpression("root('$.departments[*].name')", ctx)).toEqual(['Sales', 'Engineering']);
+
+    // context() accesses root.context
+    expect(evaluateExpression("context('$.locale')", ctx)).toBe('en-US');
+  });
+});
+
+describe('Expression Evaluator - report() Function', () => {
+  test('report() accesses report-specific variables', () => {
+    const context: ExpressionContext = {
+      data: { name: 'Test' },
+      rootData: { name: 'Test' },
+      index: 5,
+      pageNum: 3,
+      totalPages: 10,
+      groupKey: 'GroupA',
+      groupCount: 25,
+    };
+
+    expect(evaluateExpression("report('$.rowIndex')", context)).toBe(5);
+    expect(evaluateExpression("report('$.rowNum')", context)).toBe(6);
+    expect(evaluateExpression("report('$.pageNum')", context)).toBe(3);
+    expect(evaluateExpression("report('$.totalPages')", context)).toBe(10);
+    expect(evaluateExpression("report('$.groupKey')", context)).toBe('GroupA');
+    expect(evaluateExpression("report('$.groupCount')", context)).toBe(25);
+  });
+
+  test('report() with temporal variables', () => {
+    const context: ExpressionContext = {
+      data: { name: 'Test' },
+      rootData: { name: 'Test' },
+    };
+
+    // These should return valid date strings
+    const nowUtc = evaluateExpression("report('$.nowUtc')", context);
+    expect(typeof nowUtc).toBe('string');
+    expect(nowUtc).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const timeZoneId = evaluateExpression("report('$.timeZoneId')", context);
+    expect(typeof timeZoneId).toBe('string');
+  });
+
+  test('report() combined with other expressions', () => {
+    const context: ExpressionContext = {
+      data: { name: 'Item' },
+      rootData: { name: 'Item' },
+      index: 2,
+    };
+
+    expect(evaluateExpression("report('$.rowNum') + '. ' + $.name", context)).toBe('3. Item');
+    expect(evaluateExpression("'Page ' + report('$.pageNum') + ' of ' + report('$.totalPages')", context)).toBe('Page 1 of 1');
   });
 });
 
@@ -365,15 +553,15 @@ describe('Expression Evaluator - Filters (Pipe Syntax)', () => {
 
   test('Currency filter', () => {
     expect(evaluateExpression("5000 | currency", context)).toBe('$5,000.00');
-    expect(evaluateExpression("1234.56 | currency:EUR:de-DE", context)).toMatch(/1\.234,56/);
+    expect(evaluateExpression("1234.56 | currency:EUR,'de-DE'", context)).toMatch(/1\.234,56/);
   });
 
   test('String manipulation filters', () => {
-    expect(evaluateExpression("'Hello World' | truncate:5:...", context)).toBe('Hello...');
-    expect(evaluateExpression("'42' | padstart:5:0", context)).toBe('00042');
-    expect(evaluateExpression("'42' | padend:5:0", context)).toBe('42000');
-    expect(evaluateExpression("'hello-world' | replace:-:_", context)).toBe('hello_world');
-    expect(evaluateExpression("'Hello World' | slice:0:5", context)).toBe('Hello');
+    expect(evaluateExpression("'Hello World' | truncate:5,'...'", context)).toBe('Hello...');
+    expect(evaluateExpression("'42' | padstart:5,'0'", context)).toBe('00042');
+    expect(evaluateExpression("'42' | padend:5,'0'", context)).toBe('42000');
+    expect(evaluateExpression("'hello-world' | replace:'-','_'", context)).toBe('hello_world');
+    expect(evaluateExpression("'Hello World' | slice:0,5", context)).toBe('Hello');
   });
 
   test('Default filter', () => {
@@ -383,7 +571,7 @@ describe('Expression Evaluator - Filters (Pipe Syntax)', () => {
 
   test('Chained filters', () => {
     expect(evaluateExpression("' HELLO ' | lowercase | trim", context)).toBe('hello');
-    expect(evaluateExpression("'hello world' | uppercase | slice:0:5", context)).toBe('HELLO');
+    expect(evaluateExpression("'hello world' | uppercase | slice:0,5", context)).toBe('HELLO');
   });
 });
 

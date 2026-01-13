@@ -39,6 +39,7 @@ export interface ReportSectionOptions {
   parentStyles: StyleProperties[];
   defaultProperties?: Partial<ISection>;
   appendTo?: HTMLElement;
+  isPageSection?: boolean;
 }
 
 export default class ReportSection {
@@ -77,6 +78,7 @@ export default class ReportSection {
 
     this.properties.binding = options.binding || "";
     this.properties.title = options.title;
+    this.properties.isPageSection = options.isPageSection || false;
     this._designer = options.designer;
     this.parent = options.parent;
 
@@ -460,14 +462,12 @@ export default class ReportSection {
   }
 
   toJSON(): ISection {
-    return {
+    const result: ISection = {
       height: this.properties.height,
       binding: this.properties.binding,
       groupBy: this.properties.groupBy || undefined,
       orderBy: this.properties.orderBy || undefined,
       keepTogether: this.properties.keepTogether || undefined,
-      visibleOnFirstPage: this.properties.visibleOnFirstPage,
-      visibleOnLastPage: this.properties.visibleOnLastPage,
       items: this.items.map((x) => x.toJSON()),
       sections: this.subsections.map((x) => x.toJSON()),
       color: this.properties.color,
@@ -480,6 +480,14 @@ export default class ReportSection {
       fontSize: this.properties.fontSize,
       fontWeight: this.properties.fontWeight,
     };
+
+    // Only include visibleOnFirstPage/visibleOnLastPage for page sections (always export, even when false)
+    if (this.properties.isPageSection) {
+      result.visibleOnFirstPage = this.properties.visibleOnFirstPage;
+      result.visibleOnLastPage = this.properties.visibleOnLastPage;
+    }
+
+    return result;
   }
 
   dispose() {

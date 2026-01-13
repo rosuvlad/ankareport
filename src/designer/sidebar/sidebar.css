@@ -2,6 +2,8 @@
   border-left: 1px solid var(--color-border);
   background-color: var(--color-background);
   position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .anka-sidebar__content {

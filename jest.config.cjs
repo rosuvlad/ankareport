@@ -1,9 +1,8 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} **/
-export default {
+module.exports = {
   testEnvironment: "jsdom",
-  extensionsToTreatAsEsm: [".ts"],
   transform: {
-    "^.+\\.tsx?$": ["ts-jest", { useESM: true }],
+    "^.+\\.tsx?$": ["ts-jest", {}],
     "^.+\\.js$": "babel-jest",
   },
   transformIgnorePatterns: [

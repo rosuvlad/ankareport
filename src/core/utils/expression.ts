@@ -1,8 +1,9 @@
-import * as jp from 'jsonpath';
+import jsonpath from 'jsonpath';
 
 export interface ExpressionContext {
-  data: any;
-  rootData?: any;
+  data: any;           // Current binding context ($ in expressions)
+  rootData?: any;      // Root data object (for root() function)
+  contextData?: any;   // Context object (for context() function) - typically rootData.context
   index?: number;
   rowNum?: number;
   pageNum?: number;
@@ -34,13 +35,27 @@ import { parse, EvalAstFactory } from './jexpr/index.js';
 
 const astFactory = new EvalAstFactory();
 
-// Cache parsed ASTs for performance
+// Cache parsed ASTs for performance with LRU eviction
+const AST_CACHE_MAX_SIZE = 1000;
 const astCache = new Map<string, any>();
 
 function getAst(expr: string) {
-  if (astCache.has(expr)) return astCache.get(expr);
+  if (astCache.has(expr)) {
+    // Move to end for LRU behavior (most recently used)
+    const ast = astCache.get(expr);
+    astCache.delete(expr);
+    astCache.set(expr, ast);
+    return ast;
+  }
   try {
     const ast = parse(expr, astFactory);
+    
+    // Evict oldest entries if cache is full
+    if (astCache.size >= AST_CACHE_MAX_SIZE) {
+      const firstKey = astCache.keys().next().value as string;
+      if (firstKey) astCache.delete(firstKey);
+    }
+    
     astCache.set(expr, ast);
     return ast;
   } catch (e) {
@@ -51,6 +66,28 @@ function getAst(expr: string) {
 }
 
 function evaluateCore(expr: string, context: ExpressionContext): any {
+  const data = context.data;
+  const rootData = context.rootData ?? data;
+
+  // Handle simple JSONPath expressions ($.property or $.path.to.value) directly
+  // This is more reliable than relying on jexpr's $ proxy for simple paths
+  // Exclude expressions with operators, function calls, or $variables inside brackets
+  const isSimpleJsonPath = expr.startsWith('$.') && 
+    !expr.includes(' ') && 
+    !expr.includes('(') && 
+    !expr.includes('+') && 
+    !expr.includes('*') && 
+    !expr.includes('?') &&
+    !/\[\$[a-zA-Z]/.test(expr); // Exclude $.path[$variable] patterns
+  
+  if (isSimpleJsonPath) {
+    let result = resolveJsonPath(expr, data);
+    if (result === null && rootData !== data) {
+      result = resolveJsonPath(expr, rootData);
+    }
+    return result;
+  }
+
   // 1. Try generic jexpr evaluation
   const ast = getAst(expr);
   if (ast) {
@@ -102,21 +139,44 @@ function createEvaluationScope(context: ExpressionContext): any {
     // Utility functions
     localize: (key: any, defaultText?: any, locale?: any, resources?: any) =>
       evaluateLocalizeFn(key, defaultText, locale, resources, context),
-    convertTz: (dt: any, to: any, from?: any) => evaluateConvertTzFn(dt, to, from),
+    convertTz: (dt: any, to: any, from?: any) => evaluateConvertTzFn(dt, to, from, context),
     
-    // JSONPath function: var('$.path.to.data') - evaluates JSONPath against current data context
-    // Example: var('$.context.localization.localeCode')
-    var: (path: string) => {
+    // root('$.path') - evaluates JSONPath against ROOT data (for accessing root from nested contexts)
+    // Example: root('$.company.name') from inside a department iteration
+    root: (path: string) => {
       if (!path) return null;
-      // Try current data first, then rootData
-      let result = resolveJsonPath(path, data);
-      if (result === null && rootData !== data) {
-        result = resolveJsonPath(path, rootData);
-      }
-      return result;
+      return resolveJsonPath(path, rootData);
     },
     
-    // Context variables ($ prefix)
+    // context('$.path') - evaluates JSONPath against context object
+    // Example: context('$.localization.localeCode'), context('$.temporal.nowUtc')
+    context: (path: string) => {
+      if (!path) return null;
+      // Use explicit contextData if provided, otherwise fall back to rootData.context or data.context
+      const contextObj = context.contextData ?? rootData?.context ?? data?.context ?? {};
+      return resolveJsonPath(path, contextObj);
+    },
+    
+    // report('$.variable') - access report-specific variables using JSONPath-like syntax
+    // Example: report('$.rowNum'), report('$.pageNum'), report('$.nowUtc')
+    report: (path: string) => {
+      if (!path) return null;
+      const reportVars: Record<string, any> = {
+        rowIndex: context.index ?? 0,
+        rowNum: (context.index ?? 0) + 1,
+        groupKey: context.groupKey,
+        groupCount: context.groupCount ?? 0,
+        pageNum: context.pageNum ?? 1,
+        totalPages: context.totalPages ?? 1,
+        nowUtc: temporal?.nowUtc ?? now.toISOString(),
+        nowLocal: temporal?.nowLocal ?? `${now.toISOString().slice(0, -1)}${utcOffsetMinutes >= 0 ? '+' : '-'}${String(Math.abs(Math.floor(utcOffsetMinutes / 60))).padStart(2, '0')}:${String(Math.abs(utcOffsetMinutes % 60)).padStart(2, '0')}`,
+        timeZoneId: temporal?.timeZoneId ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+        utcOffsetMinutes: temporal?.utcOffsetMinutes ?? utcOffsetMinutes,
+      };
+      return resolveJsonPath(path, reportVars);
+    },
+    
+    // Legacy context variables ($ prefix) - kept for backward compatibility
     $index: context.index ?? 0,
     $rowNum: (context.index ?? 0) + 1,
     $groupKey: context.groupKey,
@@ -124,23 +184,37 @@ function createEvaluationScope(context: ExpressionContext): any {
     $pageNum: context.pageNum ?? 1,
     $totalPages: context.totalPages ?? 1,
     
-    // Temporal variables
+    // Legacy temporal variables - kept for backward compatibility
     $nowUtc: temporal?.nowUtc ?? now.toISOString(),
     $nowLocal: temporal?.nowLocal ?? `${now.toISOString().slice(0, -1)}${utcOffsetMinutes >= 0 ? '+' : '-'}${String(Math.abs(Math.floor(utcOffsetMinutes / 60))).padStart(2, '0')}:${String(Math.abs(utcOffsetMinutes % 60)).padStart(2, '0')}`,
     $timeZoneId: temporal?.timeZoneId ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     $utcOffsetMinutes: temporal?.utcOffsetMinutes ?? utcOffsetMinutes,
   };
 
-  // Merge order: Helpers > Data > RootData?
-  // Or Data > Helpers? 
-  // Usually Data first. But SUM is reserved.
+  // Create a proxy for $ that resolves JSONPath-style property access
+  // This allows expressions like $.price, $.items[0].name to work in jexpr
+  const dollarProxy = new Proxy(data, {
+    has(target, prop) {
+      return (prop in target) || (rootData && prop in rootData);
+    },
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      if (rootData && prop in rootData) return rootData[prop];
+      return undefined;
+    }
+  });
 
+  // Merge order: Helpers > Data > RootData
   return new Proxy(data, {
     has(target, prop) {
+      if (prop === '$') return true;
       if (typeof prop === 'string' && prop.startsWith('$')) return true;
       return (prop in helpers) || (prop in target) || (rootData && prop in rootData);
     },
     get(target, prop) {
+      // $ refers to current data context (for $.property syntax)
+      if (prop === '$') return dollarProxy;
+      
       if (typeof prop === 'string' && prop in helpers) return (helpers as any)[prop];
 
       if (typeof prop === 'string' && prop.startsWith('$')) {
@@ -241,16 +315,18 @@ function calculateGroupAggregate(type: string, field: string, data: any[]): numb
 
 
 function evaluateLocalizeFn(key: any, defaultText: any, locale: any, resources: any, context: ExpressionContext): string {
+  // Arguments are passed as-is - use root(), context(), or report() functions to resolve JSONPath
+  // Example: localize('greeting') or localize(root('$.item.labelKey'), 'Default', context('$.localization.localeCode'))
   const k = String(key ?? '');
   const d = defaultText !== undefined ? String(defaultText) : k;
 
-  // Resolve locale
+  // Resolve locale - use provided or fall back to context
   let localeCode = locale ? String(locale) : undefined;
   if (!localeCode) {
     localeCode = resolveJsonPath('$.context.localization.localeCode', context.rootData ?? context.data);
   }
 
-  // Resolve resources
+  // Resolve resources - use provided or fall back to context
   let res: Record<string, Record<string, string>> | undefined = resources;
   if (!res) {
     res = resolveJsonPath('$.context.localization.resources', context.rootData ?? context.data);
@@ -263,7 +339,9 @@ function evaluateLocalizeFn(key: any, defaultText: any, locale: any, resources: 
   return d;
 }
 
-function evaluateConvertTzFn(datetimeValue: any, toTz: any, fromTz: any): string {
+function evaluateConvertTzFn(datetimeValue: any, toTz: any, fromTz: any, context: ExpressionContext): string {
+  // Arguments are passed as-is - use root(), context(), or report() functions to resolve JSONPath
+  // Example: convertTz($.createdAt, context('$.temporal.timeZoneId'))
   const to = String(toTz ?? 'UTC');
 
   try {
@@ -333,7 +411,10 @@ function parseFilters(expr: string): { expr: string; filters: FilterInfo[] } {
     if (char === ')') depth--;
 
     if (char === '|' && !inQuote && depth === 0) {
-      pipeIndices.push(i);
+      // Skip || (logical OR) - only treat single | as pipe filter
+      if (expr[i + 1] !== '|' && (i === 0 || expr[i - 1] !== '|')) {
+        pipeIndices.push(i);
+      }
     }
   }
 
@@ -553,7 +634,7 @@ export function resolveJsonPath(path: string, data: any): any {
   if (!data || !path) return null;
   
   try {
-    const result = jp.query(data, path);
+    const result = jsonpath.query(data, path);
     // jp.query always returns an array, unwrap single values
     if (Array.isArray(result)) {
       if (result.length === 0) return null;

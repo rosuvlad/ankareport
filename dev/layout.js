@@ -1,11 +1,11 @@
 var layout = {
   "pageSize": "A4",
+  "orientation": "portrait",
   "initialPageNumber": 1,
+  "supportedOutputs": "PDF_AND_EXCEL",
   "pageHeaderSection": {
     "height": "auto",
     "binding": "",
-    "visibleOnFirstPage": true,
-    "visibleOnLastPage": true,
     "items": [
       {
         "x": 40,
@@ -42,7 +42,7 @@ var layout = {
         "fontSize": "10px",
         "type": "text",
         "text": "",
-        "binding": "$pageNum",
+        "binding": "report('$.pageNum')",
         "format": ""
       },
       {
@@ -66,17 +66,17 @@ var layout = {
         "fontSize": "10px",
         "type": "text",
         "text": "",
-        "binding": "$totalPages",
+        "binding": "report('$.totalPages')",
         "format": ""
       }
     ],
-    "sections": []
+    "sections": [],
+    "visibleOnFirstPage": true,
+    "visibleOnLastPage": true
   },
   "headerSection": {
     "height": 374,
     "binding": "",
-    "visibleOnFirstPage": false,
-    "visibleOnLastPage": false,
     "items": [
       {
         "x": 140,
@@ -254,16 +254,16 @@ var layout = {
         "fontWeight": "bold",
         "conditionalStyles": [
           {
-            "condition": "summary.growthRate >= 10",
+            "condition": "$.summary.growthRate >= 10",
             "color": "#4CAF50",
             "fontWeight": "bold"
           },
           {
-            "condition": "summary.growthRate < 10 && summary.growthRate >= 0",
+            "condition": "$.summary.growthRate < 10 && $.summary.growthRate >= 0",
             "color": "#FF9800"
           },
           {
-            "condition": "summary.growthRate < 0",
+            "condition": "$.summary.growthRate < 0",
             "color": "#F44336"
           }
         ],
@@ -357,8 +357,6 @@ var layout = {
     "height": "auto",
     "binding": "$.departments",
     "keepTogether": true,
-    "visibleOnFirstPage": false,
-    "visibleOnLastPage": false,
     "items": [
       {
         "x": 40,
@@ -370,7 +368,7 @@ var layout = {
         "fontWeight": "bold",
         "type": "text",
         "text": "",
-        "binding": "$rowNum + '.'",
+        "binding": "report('$.rowNum') + '.'",
         "format": ""
       },
       {
@@ -495,16 +493,16 @@ var layout = {
         "fontSize": "10px",
         "conditionalStyles": [
           {
-            "condition": "profit >= 1000000",
+            "condition": "$.profit >= 1000000",
             "color": "#4CAF50",
             "fontWeight": "bold"
           },
           {
-            "condition": "profit >= 500000 && profit < 1000000",
+            "condition": "$.profit >= 500000 && $.profit < 1000000",
             "color": "#FF9800"
           },
           {
-            "condition": "profit < 500000",
+            "condition": "$.profit < 500000",
             "color": "#F44336"
           }
         ],
@@ -547,17 +545,17 @@ var layout = {
         "fontSize": "9px",
         "conditionalStyles": [
           {
-            "condition": "status == 'exceeds'",
+            "condition": "$.status == 'exceeds'",
             "backgroundColor": "#4CAF50",
             "color": "#FFFFFF"
           },
           {
-            "condition": "status == 'meets'",
+            "condition": "$.status == 'meets'",
             "backgroundColor": "#FF9800",
             "color": "#FFFFFF"
           },
           {
-            "condition": "status == 'below'",
+            "condition": "$.status == 'below'",
             "backgroundColor": "#F44336",
             "color": "#FFFFFF"
           }
@@ -572,8 +570,6 @@ var layout = {
       {
         "height": "auto",
         "binding": "$.projects",
-        "visibleOnFirstPage": false,
-        "visibleOnLastPage": false,
         "items": [
           {
             "x": 75,
@@ -646,12 +642,12 @@ var layout = {
             "fontSize": "9px",
             "conditionalStyles": [
               {
-                "condition": "spent > budget",
+                "condition": "$.spent > $.budget",
                 "color": "#F44336",
                 "fontWeight": "bold"
               },
               {
-                "condition": "spent <= budget",
+                "condition": "$.spent <= $.budget",
                 "color": "#4CAF50"
               }
             ],
@@ -681,11 +677,11 @@ var layout = {
             "fontSize": "9px",
             "conditionalStyles": [
               {
-                "condition": "status == 'completed'",
+                "condition": "$.status == 'completed'",
                 "color": "#4CAF50"
               },
               {
-                "condition": "status == 'in_progress'",
+                "condition": "$.status == 'in_progress'",
                 "color": "#2196F3"
               }
             ],
@@ -702,8 +698,6 @@ var layout = {
   "footerSection": {
     "height": "auto",
     "binding": "",
-    "visibleOnFirstPage": false,
-    "visibleOnLastPage": false,
     "items": [
       {
         "x": 40,
@@ -748,8 +742,6 @@ var layout = {
       {
         "height": "auto",
         "binding": "$.topPerformers",
-        "visibleOnFirstPage": false,
-        "visibleOnLastPage": false,
         "items": [
           {
             "x": 50,
@@ -761,7 +753,7 @@ var layout = {
             "fontWeight": "bold",
             "type": "text",
             "text": "",
-            "binding": "$rowNum + '. ' + $.name",
+            "binding": "report('$.rowNum') + '. ' + $.name",
             "format": ""
           },
           {
@@ -797,8 +789,6 @@ var layout = {
   "pageFooterSection": {
     "height": "auto",
     "binding": "",
-    "visibleOnFirstPage": false,
-    "visibleOnLastPage": false,
     "items": [
       {
         "x": 150,
@@ -815,6 +805,8 @@ var layout = {
         "format": ""
       }
     ],
-    "sections": []
+    "sections": [],
+    "visibleOnFirstPage": true,
+    "visibleOnLastPage": true
   }
 };

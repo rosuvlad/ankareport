@@ -13,6 +13,7 @@ export default class ReportSectionProperties extends StyleProperties {
   private _keepTogether = false;
   private _visibleOnFirstPage = false;
   private _visibleOnLastPage = false;
+  private _isPageSection = false;
 
   get height() {
     return this._height;
@@ -37,6 +38,14 @@ export default class ReportSectionProperties extends StyleProperties {
   }
   get visibleOnLastPage() {
     return this._visibleOnLastPage;
+  }
+
+  get isPageSection() {
+    return this._isPageSection;
+  }
+
+  set isPageSection(value: boolean) {
+    this._isPageSection = value;
   }
 
   set height(value: number | "auto") {
@@ -85,14 +94,21 @@ export default class ReportSectionProperties extends StyleProperties {
   }
 
   getPropertyDefinitions(): Property[] {
-    return [
+    const baseProps: Property[] = [
       { field: "height", label: "Height", type: "string" },
       { field: "groupBy", label: "Group By", type: "string" },
       { field: "orderBy", label: "Order By", type: "string" },
       { field: "keepTogether", label: "Keep Together", type: "boolean" },
-      { field: "visibleOnFirstPage", label: "Visible On First Page", type: "boolean" },
-      { field: "visibleOnLastPage", label: "Visible On Last Page", type: "boolean" },
-      ...super.getPropertyDefinitions(),
     ];
+
+    // Only add visibleOnFirstPage/visibleOnLastPage for page sections
+    if (this._isPageSection) {
+      baseProps.push(
+        { field: "visibleOnFirstPage", label: "Visible On First Page", type: "boolean" },
+        { field: "visibleOnLastPage", label: "Visible On Last Page", type: "boolean" }
+      );
+    }
+
+    return [...baseProps, ...super.getPropertyDefinitions()];
   }
 }

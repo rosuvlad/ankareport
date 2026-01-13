@@ -48,6 +48,7 @@ export default class Report {
       designer: options.designer,
       parentStyles: [this.properties],
       appendTo: this.element,
+      isPageSection: true,
     });
     this.reportSectionContent = new ReportSection({
       title: "Content",
@@ -60,6 +61,7 @@ export default class Report {
       designer: options.designer,
       parentStyles: [this.properties],
       appendTo: this.element,
+      isPageSection: true,
     });
     this.reportSectionFooter = new ReportSection({
       title: "Footer",
@@ -191,13 +193,14 @@ export default class Report {
   }
 
   refresh() {
-    // Use explicit width if set, otherwise use pageSize dimensions
+    // Use explicit width if set, otherwise use pageSize dimensions with orientation
     const propWidth = typeof this.properties.width === 'number' ? this.properties.width : undefined;
     const propHeight = typeof this.properties.height === 'number' ? this.properties.height : undefined;
     const { width } = resolvePageDimensions(
       this.properties.pageSize,
       propWidth,
-      propHeight
+      propHeight,
+      this.properties.orientation
     );
     this.element.style.width = `${width}px`;
   }
@@ -225,6 +228,7 @@ export default class Report {
 
   loadLayout(layout: ILayout) {
     if (layout.pageSize) this.properties.pageSize = layout.pageSize;
+    if (layout.orientation) this.properties.orientation = layout.orientation;
     if (layout.width) this.properties.width = layout.width;
     if (layout.height) this.properties.height = layout.height;
     if (layout.initialPageNumber !== undefined) this.properties.initialPageNumber = layout.initialPageNumber;
@@ -266,6 +270,7 @@ export default class Report {
 
     return {
       pageSize: this.properties.pageSize,
+      orientation: this.properties.orientation,
       width,
       height,
       initialPageNumber: this.properties.initialPageNumber,

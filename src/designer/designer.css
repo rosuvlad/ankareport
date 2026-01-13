@@ -3,11 +3,15 @@
   flex-direction: column;
   font-family: var(--font-family);
   font-size: var(--font-size);
+  height: 100%;
+  overflow: hidden;
 }
 
 .anka-designer__content {
   flex: 1;
   display: flex;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .anka-designer__content .anka-report-item {

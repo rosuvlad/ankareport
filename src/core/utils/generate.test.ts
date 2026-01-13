@@ -118,8 +118,8 @@ describe("path-based binding", () => {
   });
 });
 
-describe("$index binding", () => {
-  test("resolves $index in content section", () => {
+describe("report() rowIndex binding", () => {
+  test("resolves report('$.rowIndex') in content section", () => {
     const layout: ILayout = {
       width: 500,
       headerSection: { height: 0, binding: "", items: [] },
@@ -127,7 +127,7 @@ describe("$index binding", () => {
         height: 50,
         binding: "$.items",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$index" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "report('$.rowIndex')" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -146,7 +146,7 @@ describe("$index binding", () => {
     expect(textItems[2].text).toBe("2");
   });
 
-  test("resolves $index in nested subsection", () => {
+  test("resolves report('$.rowIndex') in nested subsection", () => {
     const layout: ILayout = {
       width: 500,
       headerSection: { height: 0, binding: "", items: [] },
@@ -159,7 +159,7 @@ describe("$index binding", () => {
             height: 30,
             binding: "$.lines",
             items: [
-              { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$index" },
+              { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "report('$.rowIndex')" },
             ],
           },
         ],
@@ -182,7 +182,7 @@ describe("$index binding", () => {
     expect(textItems[2].text).toBe("2");
   });
 
-  test("resolves $index in path binding", () => {
+  test("resolves report('$.rowIndex') in path binding", () => {
     const layout: ILayout = {
       width: 500,
       headerSection: { height: 0, binding: "", items: [] },
@@ -190,7 +190,7 @@ describe("$index binding", () => {
         height: 50,
         binding: "$.items",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.values[$index]" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.values[report('$.rowIndex')]" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -582,6 +582,515 @@ describe("grouping and subtotals", () => {
     expect(textItems[0].text).toBe("C");
     expect(textItems[1].text).toBe("B");
     expect(textItems[2].text).toBe("A");
+  });
+});
+
+describe("conditional styles", () => {
+  test("applies conditional style when condition is true", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          {
+            type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "",
+            binding: "$.value",
+            conditionalStyles: [
+              { condition: "$.value > 100", color: "#FF0000", fontWeight: "bold" },
+            ],
+          },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { value: 50 },
+        { value: 150 },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].color).not.toBe("#FF0000"); // value 50, condition false
+    expect(textItems[1].color).toBe("#FF0000"); // value 150, condition true
+    expect(textItems[1].fontWeight).toBe("bold");
+  });
+
+  test("applies multiple conditional styles in order", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          {
+            type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "",
+            binding: "$.status",
+            conditionalStyles: [
+              { condition: "$.status == 'success'", color: "#4CAF50", backgroundColor: "#E8F5E9" },
+              { condition: "$.status == 'warning'", color: "#FF9800", backgroundColor: "#FFF3E0" },
+              { condition: "$.status == 'error'", color: "#F44336", backgroundColor: "#FFEBEE" },
+            ],
+          },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { status: "success" },
+        { status: "warning" },
+        { status: "error" },
+        { status: "unknown" },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].color).toBe("#4CAF50");
+    expect(textItems[0].backgroundColor).toBe("#E8F5E9");
+    expect(textItems[1].color).toBe("#FF9800");
+    expect(textItems[2].color).toBe("#F44336");
+    expect(textItems[3].color).not.toBe("#4CAF50"); // No condition matched
+  });
+
+  test("conditional style with complex expression", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          {
+            type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "",
+            binding: "$.profit",
+            conditionalStyles: [
+              { condition: "$.revenue > $.expenses && $.profit > 0", color: "#4CAF50" },
+              { condition: "$.revenue <= $.expenses || $.profit <= 0", color: "#F44336" },
+            ],
+          },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { revenue: 1000, expenses: 500, profit: 500 },
+        { revenue: 500, expenses: 1000, profit: -500 },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].color).toBe("#4CAF50"); // Profitable
+    expect(textItems[1].color).toBe("#F44336"); // Loss
+  });
+
+  test("conditional style with report('$.rowIndex') variable", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          {
+            type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "",
+            binding: "$.name",
+            conditionalStyles: [
+              { condition: "report('$.rowIndex') % 2 == 0", backgroundColor: "#f5f5f5" },
+            ],
+          },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].backgroundColor).toBe("#f5f5f5"); // index 0
+    expect(textItems[1].backgroundColor).toBeUndefined(); // index 1
+    expect(textItems[2].backgroundColor).toBe("#f5f5f5"); // index 2
+    expect(textItems[3].backgroundColor).toBeUndefined(); // index 3
+  });
+});
+
+describe("visibility conditions", () => {
+  test("hides item when visible condition is false", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name", visible: "$.isVisible" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { name: "Visible", isVisible: true },
+        { name: "Hidden", isVisible: false },
+        { name: "Also Visible", isVisible: true },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems.length).toBe(2);
+    expect(textItems[0].text).toBe("Visible");
+    expect(textItems[1].text).toBe("Also Visible");
+  });
+
+  test("visibility with comparison expression", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name", visible: "$.amount > 50" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { name: "Small", amount: 30 },
+        { name: "Large", amount: 100 },
+        { name: "Medium", amount: 50 },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems.length).toBe(1);
+    expect(textItems[0].text).toBe("Large");
+  });
+
+  test("visibility with report('$.rowNum') variable", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name", visible: "report('$.rowNum') <= 2" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [{ name: "First" }, { name: "Second" }, { name: "Third" }, { name: "Fourth" }],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems.length).toBe(2);
+    expect(textItems[0].text).toBe("First");
+    expect(textItems[1].text).toBe("Second");
+  });
+
+  test("visibility with string comparison", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name", visible: "$.status == 'active'" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { name: "Active Item", status: "active" },
+        { name: "Inactive Item", status: "inactive" },
+        { name: "Another Active", status: "active" },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems.length).toBe(2);
+    expect(textItems[0].text).toBe("Active Item");
+    expect(textItems[1].text).toBe("Another Active");
+  });
+});
+
+describe("expression bindings", () => {
+  test("evaluates arithmetic expression in binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.price * $.quantity" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { price: 10, quantity: 5 },
+        { price: 25, quantity: 4 },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("50");
+    expect(textItems[1].text).toBe("100");
+  });
+
+  test("evaluates string concatenation in binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.firstName + ' ' + $.lastName" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { firstName: "John", lastName: "Doe" },
+        { firstName: "Jane", lastName: "Smith" },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("John Doe");
+    expect(textItems[1].text).toBe("Jane Smith");
+  });
+
+  test("evaluates ternary expression in binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.active ? 'Yes' : 'No'" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { active: true },
+        { active: false },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("Yes");
+    expect(textItems[1].text).toBe("No");
+  });
+
+  test("evaluates nullish coalescing in binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.nickname ?? $.name" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { name: "John", nickname: "Johnny" },
+        { name: "Jane", nickname: null },
+        { name: "Bob" },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("Johnny");
+    expect(textItems[1].text).toBe("Jane");
+    expect(textItems[2].text).toBe("Bob");
+  });
+
+  test("uses report('$.rowNum') in binding expression", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "$.items",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "report('$.rowNum') + '. ' + $.name" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [{ name: "First" }, { name: "Second" }, { name: "Third" }],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("1. First");
+    expect(textItems[1].text).toBe("2. Second");
+    expect(textItems[2].text).toBe("3. Third");
+  });
+});
+
+describe("JSONPath advanced features", () => {
+  test("resolves array wildcard in binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: {
+        height: 50,
+        binding: "",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "root('$.items[*].name').join(',')" },
+        ],
+      },
+      contentSection: { height: 0, binding: "", items: [] },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [{ name: "A" }, { name: "B" }, { name: "C" }],
+    };
+
+    const items = generateItems(layout, data);
+    const textItem = items.find(x => x.type === "text");
+
+    expect(textItem?.text).toBe("A,B,C");
+  });
+
+  test("resolves filter expression in binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: {
+        height: 50,
+        binding: "",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "root('$.items[?(@.price > 15)]').length" },
+        ],
+      },
+      contentSection: { height: 0, binding: "", items: [] },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { name: "A", price: 10 },
+        { name: "B", price: 20 },
+        { name: "C", price: 30 },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItem = items.find(x => x.type === "text");
+
+    expect(textItem?.text).toBe("2"); // B and C have price > 15
+  });
+});
+
+describe("aggregate functions in expressions", () => {
+  test("sum function in header binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: {
+        height: 50,
+        binding: "",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "sum($.items.map(x => x.amount))" },
+        ],
+      },
+      contentSection: { height: 0, binding: "", items: [] },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [{ amount: 100 }, { amount: 200 }, { amount: 300 }],
+    };
+
+    const items = generateItems(layout, data);
+    const textItem = items.find(x => x.type === "text");
+
+    expect(textItem?.text).toBe("600");
+  });
+
+  test("count function in footer binding", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: { height: 0, binding: "", items: [] },
+      footerSection: {
+        height: 50,
+        binding: "",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "'Total: ' + count($.items) + ' items'" },
+        ],
+      },
+    };
+
+    const data = {
+      items: [{}, {}, {}, {}, {}],
+    };
+
+    const items = generateItems(layout, data);
+    const textItem = items.find(x => x.type === "text");
+
+    expect(textItem?.text).toBe("Total: 5 items");
   });
 });
 

@@ -71,6 +71,7 @@ export default class ChartReportItem extends BaseReportItem {
     const options: ChartOptions = {
       responsive: false,
       maintainAspectRatio: false,
+      animation: false,  // Disable all animations for static rendering
       plugins: {
         title: {
           display: !!this.properties.title,

@@ -19,31 +19,10 @@
   </head>
   <body>
     <div class="container">
-      <div class="panel">
-        <div class="panel-header">
-          <span style="flex: 1">Layout</span>
-          <input
-            id="load-layout-from-designer"
-            type="button"
-            value="Load From Designer"
-            onclick="loadLayoutFromDesigner()"
-          />
-          <input
-            id="switch-layout"
-            type="button"
-            value="Show"
-            onclick="switchLayout()"
-          />
-        </div>
-        <div class="panel-body">
-          <div id="layout-editor"></div>
-        </div>
-      </div>
-
       <div class="content">
         <div id="designer"></div>
 
-        <div>
+        <div class="export-buttons">
           <input
             id="export-to-pdf-button"
             type="button"
@@ -61,17 +40,37 @@
         <div id="report"></div>
       </div>
 
-      <div id="data-source-panel" class="panel">
-        <div class="panel-header">Data Source</div>
-        <div class="panel-body">
-          <div id="data-source-editor"></div>
+      <div id="right-panel" class="right-panel">
+        <div class="tabs">
+          <button class="panel-toggle-btn" onclick="toggleRightPanel()">☰</button>
+          <button class="tab-btn active" data-tab="layout" onclick="switchTab('layout')">Layout</button>
+          <button class="tab-btn" data-tab="data-source" onclick="switchTab('data-source')">Data Source</button>
+          <button class="tab-btn" data-tab="data" onclick="switchTab('data')">Data</button>
         </div>
-      </div>
-
-      <div id="data-panel" class="panel">
-        <div class="panel-header">Data</div>
-        <div class="panel-body">
-          <div id="data-editor"></div>
+        <div class="tab-content">
+          <div id="layout-tab" class="tab-pane active">
+            <div class="tab-toolbar">
+              <input
+                id="load-layout-from-designer"
+                type="button"
+                value="Load From Designer"
+                onclick="loadLayoutFromDesigner()"
+              />
+              <input
+                id="switch-layout"
+                type="button"
+                value="Show Report"
+                onclick="switchLayout()"
+              />
+            </div>
+            <div id="layout-editor"></div>
+          </div>
+          <div id="data-source-tab" class="tab-pane">
+            <div id="data-source-editor"></div>
+          </div>
+          <div id="data-tab" class="tab-pane">
+            <div id="data-editor"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -90,8 +89,7 @@
         "load-layout-from-designer",
       );
       const switchLayoutButton = document.getElementById("switch-layout");
-      const dataSourcePanel = document.getElementById("data-source-panel");
-      const dataPanel = document.getElementById("data-panel");
+      const rightPanel = document.getElementById("right-panel");
       const exportToPdfButton = document.getElementById("export-to-pdf-button");
       const exportToXlsxButton = document.getElementById("export-to-xlsx-button");
 
@@ -139,12 +137,26 @@
             layout,
             data,
           });
+
+          // Update export button visibility based on supportedOutputs (only in report view)
+          if (page === 1) {
+            updateExportButtons(layout.supportedOutputs);
+          }
         } catch (e) {
           // Only log non-JSON parse errors (ignore incomplete JSON while typing)
           if (!(e instanceof SyntaxError)) {
             console.error("Error refreshing report:", e);
           }
         }
+      };
+
+      const updateExportButtons = (supportedOutputs) => {
+        const outputs = supportedOutputs || "PDF_AND_EXCEL";
+        const showPdf = outputs === "PDF_AND_EXCEL" || outputs === "PDF";
+        const showExcel = outputs === "PDF_AND_EXCEL" || outputs === "EXCEL";
+        
+        exportToPdfButton.style.display = showPdf ? null : "none";
+        exportToXlsxButton.style.display = showExcel ? null : "none";
       };
 
       layoutEditor.on("change", () => {
@@ -189,8 +201,6 @@
         loadLayoutFromDesignerButton.style.display = null;
         exportToPdfButton.style.display = "none";
         exportToXlsxButton.style.display = "none";
-        dataSourcePanel.style.display = null;
-        dataPanel.style.display = "none";
       };
 
       const showReport = () => {
@@ -199,10 +209,15 @@
         designerDiv.style.display = "none";
         rendererDiv.style.display = null;
         loadLayoutFromDesignerButton.style.display = "none";
-        exportToPdfButton.style.display = null;
-        exportToXlsxButton.style.display = null;
-        dataSourcePanel.style.display = "none";
-        dataPanel.style.display = null;
+        // Show export buttons based on supportedOutputs
+        try {
+          const layout = JSON.parse(layoutEditor.getValue());
+          updateExportButtons(layout.supportedOutputs);
+        } catch {
+          // Default to showing both if layout can't be parsed
+          exportToPdfButton.style.display = null;
+          exportToXlsxButton.style.display = null;
+        }
       };
 
       showDesigner();
@@ -221,6 +236,25 @@
       const loadLayoutFromDesigner = () => {
         const layout = designer.toJSON();
         layoutEditor.setValue(JSON.stringify(layout, null, 2), 1);
+      };
+
+      const switchTab = (tabName) => {
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
+        
+        // Update tab panes
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+      };
+
+      const toggleRightPanel = () => {
+        const panel = rightPanel;
+        if (panel.classList.contains('collapsed')) {
+          panel.classList.remove('collapsed');
+        } else {
+          panel.classList.add('collapsed');
+        }
       };
     </script>
   </body>

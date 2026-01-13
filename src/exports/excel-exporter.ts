@@ -17,7 +17,7 @@ export async function exportToXlsx(layout: ILayout, data: any) {
 
   // Handle Page Header (Visible on First Page)
   if (layout.pageHeaderSection && layout.pageHeaderSection.visibleOnFirstPage) {
-    const headerItems = generatePageSectionItems(layout.pageHeaderSection, data, 0, { data, rootData: data, pageNum: initialPage, totalPages: 1 });
+    const headerItems = generatePageSectionItems(layout.pageHeaderSection, data, 0, { data, rootData: data, contextData: data?.context, pageNum: initialPage, totalPages: 1 });
 
     // Calculate header height
     let headerHeight = 0;
@@ -44,7 +44,7 @@ export async function exportToXlsx(layout: ILayout, data: any) {
     // Add padding
     contentBottom += 10;
 
-    const footerItems = generatePageSectionItems(layout.pageFooterSection, data, 0, { data, rootData: data, pageNum: initialPage, totalPages: 1 });
+    const footerItems = generatePageSectionItems(layout.pageFooterSection, data, 0, { data, rootData: data, contextData: data?.context, pageNum: initialPage, totalPages: 1 });
 
     // Shift footer items to bottom
     footerItems.forEach(item => item.y += contentBottom);
@@ -58,10 +58,10 @@ export async function exportToXlsx(layout: ILayout, data: any) {
   const workbook = new Workbook();
   const worksheet = workbook.addWorksheet("Worksheet1");
 
-  // Set page setup based on layout pageSize
+  // Set page setup based on layout pageSize and orientation
   worksheet.pageSetup = {
     paperSize: getExcelPaperSize(layout.pageSize),
-    orientation: "portrait",
+    orientation: layout.orientation || "portrait",
     fitToPage: true,
     fitToWidth: 1,
     fitToHeight: 0,

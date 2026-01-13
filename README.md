@@ -40,13 +40,13 @@ Free & Open Source Web Reporting Tool with visual designer, data binding, and mu
 - Simple field binding: `binding: "$.fieldName"`
 - Nested object access: `binding: "$.object.nested.field"`
 - Array access: `binding: "$.items[0].name"`
-- Array wildcard: `binding: "$.items[*].id"` (returns an array of ids)
-- Recursive descent: `binding: "$..price"` (finds all price fields)
-- Filter expressions: `binding: "$.items[?(@.price < 10)]"`
 - Expressions: `binding: "$.price * $.quantity"`
-- Arrow Functions: `binding: "$.items.map(x => x.name).join(', ')"`
 - String concatenation: `binding: "$.firstName + ' ' + $.lastName"`
-- Built-in variables: `$index`, `$rowNum`, `$pageNum`, `$totalPages`
+- **Data Access Functions:**
+  - `root('$.path')` - Access root data from nested contexts
+  - `context('$.path')` - Access localization/temporal settings
+  - `report('$.var')` - Access report variables (rowNum, pageNum, etc.)
+- Advanced JSONPath via `root()`: wildcards, filters, recursive descent
 - Localization: `binding: "localize('key')"`
 
 ### Formatting
@@ -394,131 +394,314 @@ pageHeaderSection: {
 
 ## Expression Reference
 
-AnkaReport uses a powerful expression system combining **jexpr** (JavaScript expression evaluator) with **JSONPath** (industry-standard data query language).
+AnkaReport uses a powerful expression system combining **jexpr** (JavaScript expression evaluator) with **JSONPath** for data access. All data property access uses the `$.` prefix consistently.
 
-### Understanding Expression Contexts
+### Core Concept: The `$` Symbol
 
-There are **two different contexts** where expressions are used, each with different syntax:
+The `$` symbol represents the **current binding context** - the data object at the current iteration level:
 
-| Context | Syntax | When to Use |
-|---------|--------|-------------|
-| **Data Bindings** | JSONPath (`$.path`) | `binding` property for text, images, barcodes, charts |
-| **Section Bindings** | JSONPath (`$.path`) | `binding` property on sections to iterate over arrays |
-| **Conditions** | jexpr (no `$.` prefix) | `condition` property in conditionalStyles, `visible` property |
-| **Expressions** | jexpr (scope-based) | Arithmetic, string operations, function calls |
-
-### JSONPath Syntax (for Data Bindings)
-
-JSONPath is used to extract data from your JSON. All paths start with `$.` (root).
+- In **section bindings**: `$` = root data object
+- In **content section items** (iterating over an array): `$` = current array item
+- In **nested subsections**: `$` = current nested item
 
 ```js
-// Basic property access
-"$.company.name"                    // → "Acme Corp"
-"$.address.city"                    // → "New York"
+// Data structure:
+{
+  companyName: "Acme Corp",
+  departments: [
+    { name: "Sales", employees: [{ name: "John" }, { name: "Jane" }] }
+  ]
+}
 
-// Array access
-"$.items[0].name"                   // → First item's name
-"$.items[2].price"                  // → Third item's price
+// In headerSection: $ = root data
+"$.companyName"                     // → "Acme Corp"
 
-// Array wildcard - extract from all items
-"$.items[*].name"                   // → ["Item 1", "Item 2", "Item 3"]
-"$.orders[*].total"                 // → [100, 200, 150]
+// In contentSection with binding "$.departments": $ = current department
+"$.name"                            // → "Sales"
 
-// Recursive descent - find all matching properties
-"$..price"                          // → All prices in entire document
-"$..name"                           // → All name fields anywhere
-
-// Filter expressions - query with conditions
-"$.items[?(@.price > 100)]"         // → Items where price > 100
-"$.users[?(@.active == true)]"      // → Active users only
-"$.books[?(@.author == 'Smith')]"   // → Books by Smith
-
-// Complex filters
-"$.items[?(@.price > 50 && @.inStock)]"  // → Expensive in-stock items
+// In nested section with binding "$.employees": $ = current employee
+"$.name"                            // → "John", "Jane"
 ```
 
-### jexpr Syntax (for Conditions & Expressions)
+### Expression Syntax by Field Type
 
-jexpr evaluates JavaScript-like expressions against the current data scope.
+| Field | Syntax | Description |
+|-------|--------|-------------|
+| `binding` (sections) | `$.path` | JSONPath to array for iteration |
+| `binding` (items) | `$.property` or expression | Data binding with current context |
+| `condition` | `$.property` comparison | Conditional styling conditions |
+| `visible` | `$.property` comparison | Visibility conditions |
+
+### Data Access Functions
+
+AnkaReport provides three functions for accessing data from different scopes:
+
+| Function | Scope | Use Case |
+|----------|-------|----------|
+| `root('$.path')` | Root data object | Access root data from nested iterations |
+| `context('$.path')` | `root.context` object | Access localization, temporal, settings |
+| `report('$.var')` | Report variables | Access rowNum, pageNum, etc. |
+
+#### `root('$.path')` - Access Root Data
+
+Use `root()` to access the root data object from anywhere, including nested iterations:
 
 ```js
-// Arithmetic
-"price * quantity"                  // Multiplication
-"subtotal + tax"                    // Addition
-"(price - discount) * qty"          // Complex math
-"total / count"                     // Division
-"index % 2"                         // Modulo
+// Inside a nested employee iteration, access company name from root:
+"root('$.companyName')"             // → "Acme Corp"
 
-// Comparisons
-"amount > 1000"                     // Greater than
-"status == 'active'"                // Equality
-"price >= minPrice && price <= maxPrice"  // Range check
+// Get all department names from root:
+"root('$.departments[*].name')"     // → ["Sales", "Engineering"]
+
+// Sum all budgets from root:
+"sum(root('$.departments[*].budget'))"
+```
+
+#### `context('$.path')` - Access Context Object
+
+Use `context()` to access the `root.context` object containing localization, temporal data, and settings:
+
+```js
+// Access localization settings
+"context('$.localization.localeCode')"     // → "en-US"
+
+// Access temporal data
+"context('$.temporal.timeZoneId')"         // → "America/New_York"
+"context('$.temporal.nowUtc')"             // → "2024-01-15T10:30:00Z"
+
+// Access custom settings
+"context('$.settings.currency')"           // → "USD"
+```
+
+#### `report('$.var')` - Access Report Variables
+
+Use `report()` to access report-specific variables:
+
+```js
+// Row/index information
+"report('$.rowIndex')"              // → 0, 1, 2... (0-based)
+"report('$.rowNum')"                // → 1, 2, 3... (1-based)
+
+// Page information
+"report('$.pageNum')"               // → Current page number
+"report('$.totalPages')"            // → Total page count
+
+// Group information
+"report('$.groupKey')"              // → Current group key
+"report('$.groupCount')"            // → Items in current group
+
+// Temporal information
+"report('$.nowUtc')"                // → Current UTC timestamp
+"report('$.nowLocal')"              // → Current local timestamp
+"report('$.timeZoneId')"            // → Current timezone ID
+"report('$.utcOffsetMinutes')"      // → UTC offset in minutes
+```
+
+### Property Access Syntax
+
+All data properties use the `$.` prefix:
+
+```js
+// Simple property access
+"$.name"                            // Current item's name
+"$.customer.email"                  // Nested property
+
+// Array access
+"$.items[0].name"                   // First item's name
+"$.items[2].price"                  // Third item's price
+
+// Arithmetic expressions
+"$.price * $.quantity"              // Multiplication
+"$.subtotal + $.tax"                // Addition
+"($.price - $.discount) * $.qty"    // Complex math
+
+// String concatenation
+"$.firstName + ' ' + $.lastName"    // → "John Doe"
+"report('$.rowNum') + '. ' + $.name" // → "1. Product A"
+
+// Comparisons (in conditions)
+"$.amount > 1000"                   // Greater than
+"$.status == 'active'"              // Equality
+"$.price >= 100 && $.price <= 500"  // Range check
 
 // Logical operators
-"isActive && hasPermission"         // AND
-"isAdmin || isModerator"            // OR
-"!isDeleted"                        // NOT
+"$.isActive && $.hasPermission"     // AND
+"$.isAdmin || $.isModerator"        // OR
+"!$.isDeleted"                      // NOT
 
-// Ternary (conditional)
-"amount > 0 ? amount : 0"           // If-else
-"status == 'active' ? 'Yes' : 'No'" // Conditional text
+// Ternary expressions
+"$.amount > 0 ? $.amount : 0"       // Conditional value
+```
 
-// String operations
-"firstName + ' ' + lastName"        // Concatenation
-"'Order #' + orderNumber"           // Prefix
-"name + ' (' + code + ')'"          // Complex string
+### Advanced JSONPath (via `root()`)
 
-// Nullish coalescing
-"nickname ?? name"                  // Use name if nickname is null
-"value ?? 'N/A'"                    // Default value
+For advanced JSONPath queries, use the `root()` function:
+
+```js
+// Array wildcard - extract from all items
+"root('$.items[*].name')"           // → ["Item 1", "Item 2", "Item 3"]
+
+// Recursive descent - find all matching properties
+"root('$..price')"                  // → All prices in document
+
+// Filter expressions
+"root('$.items[?(@.price > 100)]')" // → Items where price > 100
+"root('$.users[?(@.active)]')"      // → Active users only
+```
+
+### Aggregate Functions
+
+```js
+// Sum values
+"sum($.items.map(x => x.price))"
+"sum(root('$.allPrices'))"
+
+// Average
+"avg($.scores)"
+
+// Count
+"count($.items)"
+
+// Min/Max
+"min($.prices)"
+"max($.prices)"
+```
+
+### Utility Functions
+
+#### `localize(key, default?, locale?, resources?)`
+
+Get translated text from localization resources:
+
+```js
+// Basic usage - key lookup
+"localize('report_title')"
+
+// With default fallback
+"localize('report_title', 'Annual Report')"
+
+// With explicit locale
+"localize('greeting', 'Hello', context('$.localization.localeCode'))"
+
+// With dynamic key from data
+"localize($.labelKey, 'Default Text')"
+```
+
+#### `convertTz(datetime, toTimezone, fromTimezone?)`
+
+Convert datetime between timezones:
+
+```js
+// Convert to specific timezone
+"convertTz($.createdAt, 'America/New_York')"
+
+// Using context for timezone
+"convertTz($.eventDate, context('$.temporal.timeZoneId'))"
+
+// Literal timezone
+"convertTz($.timestamp, 'Europe/London')"
+```
+
+### Filters (Pipe Syntax)
+
+Apply transformations using the pipe `|` operator:
+
+#### String Filters
+
+```js
+"$.name | uppercase"                // → "JOHN DOE"
+"$.name | lowercase"                // → "john doe"
+"$.name | capitalize"               // → "John Doe"
+"$.text | trim"                     // Remove whitespace
+"$.desc | truncate:50,'...'"        // → "Long text..."
+"$.code | padstart:5,'0'"           // → "00042"
+"$.code | padend:5,'0'"             // → "42000"
+"$.text | replace:'-','_'"          // Replace characters
+"$.name | slice:0,5"                // Substring
+```
+
+#### Number Filters
+
+```js
+"$.amount | currency"               // → "$1,234.56" (USD default)
+"$.amount | currency:EUR,'de-DE'"   // → "1.234,56 €"
+"$.value | number:2"                // → "1234.57" (2 decimals)
+"$.rate | percent:1"                // → "25.5%"
+"$.value | abs"                     // Absolute value
+"$.value | round"                   // Round to integer
+"$.value | floor"                   // Round down
+"$.value | ceil"                    // Round up
+```
+
+#### Date Filters
+
+```js
+"$.date | date"                     // → "2024-01-15" (ISO format)
+"$.date | date:'yyyy-MM-dd'"        // → "2024-01-15"
+"$.date | time"                     // → "10:30:00 AM"
+"$.date | datetime"                 // → "1/15/2024, 10:30:00 AM"
+```
+
+#### Utility Filters
+
+```js
+"$.value | default:'N/A'"           // → "N/A" if null/empty
+"$.object | json"                   // → JSON string
+```
+
+#### Chained Filters
+
+```js
+"$.name | lowercase | trim"         // Multiple transformations
+"$.text | uppercase | slice:0,10"   // Chain operations
 ```
 
 ### Practical Examples
 
-#### Example 1: Simple Text Binding
+#### Example 1: Simple Data Binding
+
 ```json
 {
   "type": "text",
   "binding": "$.customer.name"
 }
 ```
-**Data:** `{ "customer": { "name": "John Doe" } }`
-**Result:** "John Doe"
 
 #### Example 2: Calculated Value
+
 ```json
 {
   "type": "text",
   "binding": "$.price * $.quantity"
 }
 ```
-**Data:** `{ "price": 25, "quantity": 4 }`
-**Result:** 100
 
 #### Example 3: Row Numbering
+
 ```json
 {
   "type": "text",
-  "binding": "$rowNum + '. ' + $.name"
+  "binding": "report('$.rowNum') + '. ' + $.name"
 }
 ```
 **Result:** "1. Product A", "2. Product B", etc.
 
 #### Example 4: Conditional Styling
+
 ```json
 {
   "type": "text",
   "binding": "$.profit",
   "conditionalStyles": [
-    { "condition": "profit >= 10000", "color": "#4CAF50", "fontWeight": "bold" },
-    { "condition": "profit >= 5000 && profit < 10000", "color": "#FF9800" },
-    { "condition": "profit < 5000", "color": "#F44336" }
+    { "condition": "$.profit >= 10000", "color": "#4CAF50", "fontWeight": "bold" },
+    { "condition": "$.profit >= 5000 && $.profit < 10000", "color": "#FF9800" },
+    { "condition": "$.profit < 5000", "color": "#F44336" }
   ]
 }
 ```
-**Note:** Conditions use jexpr (no `$.` prefix) because they evaluate against the current scope.
 
 #### Example 5: Section with Array Binding
+
 ```json
 {
   "contentSection": {
@@ -531,9 +714,9 @@ jexpr evaluates JavaScript-like expressions against the current data scope.
   }
 }
 ```
-**Data:** `{ "orders": [{ "orderNumber": "001", "customer": { "name": "John" }, "total": 150 }, ...] }`
 
 #### Example 6: Nested Sections
+
 ```json
 {
   "contentSection": {
@@ -554,24 +737,54 @@ jexpr evaluates JavaScript-like expressions against the current data scope.
 }
 ```
 
-#### Example 7: Using var() for Deep JSONPath Queries
-```json
-{
-  "type": "text",
-  "binding": "var('$.context.localization.localeCode')"
-}
-```
-Use `var()` when you need JSONPath queries inside jexpr expressions.
+#### Example 7: Accessing Root Data from Nested Context
 
-#### Example 8: Aggregate Functions
 ```json
 {
-  "type": "text",
-  "binding": "sum(items.map(x => x.amount))"
+  "contentSection": {
+    "binding": "$.departments",
+    "items": [
+      { "type": "text", "binding": "root('$.companyName') + ' - ' + $.name" }
+    ]
+  }
 }
 ```
 
-#### Example 9: Group Footer with Subtotals
+#### Example 8: Using Context for Localization
+
+```json
+{
+  "type": "text",
+  "binding": "localize('report_title', 'Annual Report', context('$.localization.localeCode'))"
+}
+```
+
+#### Example 9: Page Numbers
+
+```json
+{
+  "pageHeaderSection": {
+    "items": [
+      { "type": "text", "binding": "'Page ' + report('$.pageNum') + ' of ' + report('$.totalPages')" }
+    ]
+  }
+}
+```
+
+#### Example 10: Alternating Row Colors
+
+```json
+{
+  "type": "text",
+  "binding": "$.name",
+  "conditionalStyles": [
+    { "condition": "report('$.rowIndex') % 2 == 0", "backgroundColor": "#f5f5f5" }
+  ]
+}
+```
+
+#### Example 11: Group Footer with Aggregates
+
 ```json
 {
   "groupFooter": {
@@ -584,95 +797,102 @@ Use `var()` when you need JSONPath queries inside jexpr expressions.
 }
 ```
 
-#### Example 10: Page Numbers
+#### Example 12: Visibility Conditions
+
 ```json
 {
-  "pageHeaderSection": {
+  "type": "text",
+  "binding": "$.secretData",
+  "visible": "$.isAuthorized"
+}
+```
+
+#### Example 13: Chart with Data Binding
+
+```json
+{
+  "type": "chart",
+  "chartType": "bar",
+  "labelsBinding": "$.departments.map(d => d.name)",
+  "datasetsBinding": "[{label: 'Revenue', data: $.departments.map(d => d.revenue), backgroundColor: '#4CAF50'}]"
+}
+```
+
+### Legacy Variables (Backward Compatibility)
+
+The following legacy syntax is still supported but the new `report()` function is recommended:
+
+| Legacy | New Syntax | Description |
+|--------|------------|-------------|
+| `$index` | `report('$.rowIndex')` | 0-based row index |
+| `$rowNum` | `report('$.rowNum')` | 1-based row number |
+| `$pageNum` | `report('$.pageNum')` | Current page |
+| `$totalPages` | `report('$.totalPages')` | Total pages |
+| `$groupKey` | `report('$.groupKey')` | Group key |
+| `$groupCount` | `report('$.groupCount')` | Group item count |
+| `$nowUtc` | `report('$.nowUtc')` | UTC timestamp |
+| `$nowLocal` | `report('$.nowLocal')` | Local timestamp |
+| `$timeZoneId` | `report('$.timeZoneId')` | Timezone ID |
+
+### Group Aggregate Variables
+
+When using `groupBy`, these variables are available in group headers/footers:
+
+| Variable | Description |
+|----------|-------------|
+| `$sum_fieldName` | Sum of field in group |
+| `$avg_fieldName` | Average of field in group |
+| `$min_fieldName` | Minimum value in group |
+| `$max_fieldName` | Maximum value in group |
+| `$groupKey` | Current group value |
+| `$groupCount` | Number of items in group |
+
+```json
+{
+  "groupFooter": {
     "items": [
-      { "type": "text", "binding": "'Page ' + $pageNum + ' of ' + $totalPages" }
+      { "type": "text", "binding": "$sum_revenue | currency" },
+      { "type": "text", "binding": "$avg_price | number:2" }
     ]
   }
 }
 ```
 
-### Built-in Variables
+### Data Context Structure
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `$index` | Zero-based index in array | `$index` → 0, 1, 2... |
-| `$rowNum` | One-based row number | `$rowNum` → 1, 2, 3... |
-| `$pageNum` | Current page (PDF) | `$pageNum` → 1 |
-| `$totalPages` | Total pages (PDF) | `$totalPages` → 5 |
-| `$groupKey` | Current group value | `$groupKey` → "Category A" |
-| `$groupCount` | Items in group | `$groupCount` → 10 |
-| `$sum_field` | Sum of field in group | `$sum_amount` → 1500 |
-| `$avg_field` | Average in group | `$avg_price` → 25.5 |
-| `$min_field` | Minimum in group | `$min_quantity` → 1 |
-| `$max_field` | Maximum in group | `$max_quantity` → 100 |
-
-### Temporal Variables
-
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `$nowUtc` | Current UTC datetime | "2024-01-15T10:30:00.000Z" |
-| `$nowLocal` | Local datetime | "2024-01-15T12:30:00+02:00" |
-| `$timeZoneId` | Timezone ID | "Europe/Bucharest" |
-| `$utcOffsetMinutes` | UTC offset | 120 |
-
-### Functions
-
-| Function | Description | Example |
-|----------|-------------|---------|
-| `var(path)` | Evaluate JSONPath | `var('$.config.theme')` |
-| `localize(key, [default])` | Get translation | `localize('title', 'Report')` |
-| `convertTz(date, toTz)` | Convert timezone | `convertTz(date, 'America/New_York')` |
-| `sum(array)` | Sum values | `sum(items.map(x => x.price))` |
-| `avg(array)` | Average | `avg(scores)` |
-| `count(array)` | Count items | `count(items)` |
-| `min(array)` | Minimum | `min(prices)` |
-| `max(array)` | Maximum | `max(prices)` |
-
-### Filters (Pipe Syntax)
-
-Apply transformations using the pipe `|` operator:
+For full functionality, structure your data with a `context` object:
 
 ```js
-// String filters
-"$.name | uppercase"                // "JOHN DOE"
-"$.name | lowercase"                // "john doe"
-"$.name | capitalize"               // "John Doe"
-"$.text | trim"                     // Remove whitespace
-"$.text | truncate:20:..."          // "Long text here..."
-"$.code | padstart:5:0"             // "00042"
-"$.text | replace:old:new"          // Replace text
-"$.text | slice:0:10"               // Substring
-
-// Number filters
-"$.amount | currency"               // "$1,234.56"
-"$.amount | currency:EUR:de-DE"     // "1.234,56 €"
-"$.value | number:2"                // "1234.57"
-"$.rate | percent:1"                // "25.5%"
-"$.value | abs"                     // Absolute value
-"$.value | round"                   // Round to integer
-"$.value | floor"                   // Round down
-"$.value | ceil"                    // Round up
-
-// Date filters
-"$.date | date:YYYY-MM-DD"          // "2024-01-15"
-"$.date | time"                     // "10:30:00 AM"
-"$.date | datetime"                 // "1/15/2024, 10:30:00 AM"
-
-// Utility filters
-"$.value | default:N/A"             // "N/A" if null/empty
-"$.object | json"                   // JSON string
-
-// Chained filters
-"$.name | lowercase | trim"         // Multiple transformations
+const data = {
+  // Your report data
+  companyName: "Acme Corp",
+  departments: [...],
+  
+  // Context object for localization, temporal, and settings
+  context: {
+    localization: {
+      localeCode: "en-US",
+      resources: {
+        "en-US": { "report_title": "Annual Report" },
+        "es-ES": { "report_title": "Informe Anual" }
+      }
+    },
+    temporal: {
+      nowUtc: "2024-01-15T10:30:00Z",
+      timeZoneId: "America/New_York",
+      utcOffsetMinutes: -300
+    },
+    settings: {
+      currency: "USD",
+      dateFormat: "MM/dd/yyyy"
+    }
+  }
+};
 ```
 
 ## Conditional Styles
 
-Apply dynamic styles based on data conditions. **Conditions use jexpr syntax** (no `$.` prefix):
+Apply dynamic styles based on data conditions. **Conditions use the `$.` prefix** for data access:
 
 ```js
 {
@@ -681,19 +901,19 @@ Apply dynamic styles based on data conditions. **Conditions use jexpr syntax** (
   conditionalStyles: [
     // Green for active
     { 
-      condition: "status == 'active'", 
+      condition: "$.status == 'active'", 
       backgroundColor: "#4CAF50", 
       color: "#FFFFFF" 
     },
     // Red for inactive
     { 
-      condition: "status == 'inactive'", 
+      condition: "$.status == 'inactive'", 
       backgroundColor: "#F44336", 
       color: "#FFFFFF" 
     },
     // Bold for high values
     { 
-      condition: "value > 1000", 
+      condition: "$.value > 1000", 
       fontWeight: "bold",
       color: "#2196F3"
     }

@@ -2,10 +2,13 @@ import { TextAlign } from "./styleProperties";
 
 export type PageSize = "A2" | "A3" | "A4" | "A5" | "Letter" | "Legal" | "Tabloid";
 
+export type PageOrientation = "portrait" | "landscape";
+
 export type SupportedOutputs = "PDF_AND_EXCEL" | "PDF" | "EXCEL";
 
 export interface ILayout extends IStyle {
   pageSize?: PageSize;
+  orientation?: PageOrientation; // Default: "portrait"
   width?: number;
   height?: number;
   headerSection: ISection;

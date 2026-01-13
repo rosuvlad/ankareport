@@ -1,4 +1,4 @@
-import { PageSize } from "../layout";
+import { PageSize, PageOrientation } from "../layout";
 
 // Page dimensions in points (1 point = 1/72 inch)
 export interface PageDimensions {
@@ -6,7 +6,7 @@ export interface PageDimensions {
   height: number;
 }
 
-// Standard page sizes in points
+// Standard page sizes in points (portrait orientation)
 const PAGE_SIZES: Record<PageSize, PageDimensions> = {
   A2: { width: 1191, height: 1684 },
   A3: { width: 842, height: 1191 },
@@ -17,26 +17,39 @@ const PAGE_SIZES: Record<PageSize, PageDimensions> = {
   Tabloid: { width: 792, height: 1224 },
 };
 
-// Default page size
+// Default page size and orientation
 const DEFAULT_PAGE_SIZE: PageSize = "A4";
+const DEFAULT_ORIENTATION: PageOrientation = "portrait";
 
 /**
  * Get page dimensions from a page size name
  */
-export function getPageDimensions(pageSize?: PageSize): PageDimensions {
-  return PAGE_SIZES[pageSize || DEFAULT_PAGE_SIZE];
+export function getPageDimensions(pageSize?: PageSize, orientation?: PageOrientation): PageDimensions {
+  const baseDimensions = PAGE_SIZES[pageSize || DEFAULT_PAGE_SIZE];
+  const orient = orientation || DEFAULT_ORIENTATION;
+  
+  // Swap width and height for landscape orientation
+  if (orient === "landscape") {
+    return {
+      width: baseDimensions.height,
+      height: baseDimensions.width,
+    };
+  }
+  
+  return baseDimensions;
 }
 
 /**
  * Resolve page dimensions from layout settings
- * Priority: explicit width/height > pageSize > default (A4)
+ * Priority: explicit width/height > pageSize with orientation > default (A4 portrait)
  */
 export function resolvePageDimensions(
   pageSize?: PageSize,
   width?: number,
-  height?: number
+  height?: number,
+  orientation?: PageOrientation
 ): PageDimensions {
-  const baseDimensions = getPageDimensions(pageSize);
+  const baseDimensions = getPageDimensions(pageSize, orientation);
   
   return {
     width: width ?? baseDimensions.width,

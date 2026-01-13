@@ -49,13 +49,13 @@ function getAst(expr: string) {
   }
   try {
     const ast = parse(expr, astFactory);
-    
+
     // Evict oldest entries if cache is full
     if (astCache.size >= AST_CACHE_MAX_SIZE) {
       const firstKey = astCache.keys().next().value as string;
       if (firstKey) astCache.delete(firstKey);
     }
-    
+
     astCache.set(expr, ast);
     return ast;
   } catch (e) {
@@ -72,14 +72,14 @@ function evaluateCore(expr: string, context: ExpressionContext): any {
   // Handle simple JSONPath expressions ($.property or $.path.to.value) directly
   // This is more reliable than relying on jexpr's $ proxy for simple paths
   // Exclude expressions with operators, function calls, or $variables inside brackets
-  const isSimpleJsonPath = expr.startsWith('$.') && 
-    !expr.includes(' ') && 
-    !expr.includes('(') && 
-    !expr.includes('+') && 
-    !expr.includes('*') && 
+  const isSimpleJsonPath = expr.startsWith('$.') &&
+    !expr.includes(' ') &&
+    !expr.includes('(') &&
+    !expr.includes('+') &&
+    !expr.includes('*') &&
     !expr.includes('?') &&
     !/\[\$[a-zA-Z]/.test(expr); // Exclude $.path[$variable] patterns
-  
+
   if (isSimpleJsonPath) {
     let result = resolveJsonPath(expr, data);
     if (result === null && rootData !== data) {
@@ -135,19 +135,19 @@ function createEvaluationScope(context: ExpressionContext): any {
     count: (arg: any) => aggregate('COUNT', arg),
     min: (arg: any) => aggregate('MIN', arg),
     max: (arg: any) => aggregate('MAX', arg),
-    
+
     // Utility functions
     localize: (key: any, defaultText?: any, locale?: any, resources?: any) =>
       evaluateLocalizeFn(key, defaultText, locale, resources, context),
     convertTz: (dt: any, to: any, from?: any) => evaluateConvertTzFn(dt, to, from, context),
-    
+
     // root('$.path') - evaluates JSONPath against ROOT data (for accessing root from nested contexts)
     // Example: root('$.company.name') from inside a department iteration
     root: (path: string) => {
       if (!path) return null;
       return resolveJsonPath(path, rootData);
     },
-    
+
     // context('$.path') - evaluates JSONPath against context object
     // Example: context('$.localization.localeCode'), context('$.temporal.nowUtc')
     context: (path: string) => {
@@ -156,7 +156,7 @@ function createEvaluationScope(context: ExpressionContext): any {
       const contextObj = context.contextData ?? rootData?.context ?? data?.context ?? {};
       return resolveJsonPath(path, contextObj);
     },
-    
+
     // report('$.variable') - access report-specific variables using JSONPath-like syntax
     // Example: report('$.rowNum'), report('$.pageNum'), report('$.nowUtc')
     report: (path: string) => {
@@ -175,7 +175,7 @@ function createEvaluationScope(context: ExpressionContext): any {
       };
       return resolveJsonPath(path, reportVars);
     },
-    
+
     // Legacy context variables ($ prefix) - kept for backward compatibility
     $index: context.index ?? 0,
     $rowNum: (context.index ?? 0) + 1,
@@ -183,7 +183,7 @@ function createEvaluationScope(context: ExpressionContext): any {
     $groupCount: context.groupCount ?? 0,
     $pageNum: context.pageNum ?? 1,
     $totalPages: context.totalPages ?? 1,
-    
+
     // Legacy temporal variables - kept for backward compatibility
     $nowUtc: temporal?.nowUtc ?? now.toISOString(),
     $nowLocal: temporal?.nowLocal ?? `${now.toISOString().slice(0, -1)}${utcOffsetMinutes >= 0 ? '+' : '-'}${String(Math.abs(Math.floor(utcOffsetMinutes / 60))).padStart(2, '0')}:${String(Math.abs(utcOffsetMinutes % 60)).padStart(2, '0')}`,
@@ -214,7 +214,7 @@ function createEvaluationScope(context: ExpressionContext): any {
     get(target, prop) {
       // $ refers to current data context (for $.property syntax)
       if (prop === '$') return dollarProxy;
-      
+
       if (typeof prop === 'string' && prop in helpers) return (helpers as any)[prop];
 
       if (typeof prop === 'string' && prop.startsWith('$')) {
@@ -632,7 +632,9 @@ function resolvePath(path: string, context: ExpressionContext): any {
  */
 export function resolveJsonPath(path: string, data: any): any {
   if (!data || !path) return null;
-  
+
+  if (path === '$' || path === '$.') return data;
+
   try {
     const result = jsonpath.query(data, path);
     // jp.query always returns an array, unwrap single values

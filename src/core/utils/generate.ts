@@ -577,8 +577,8 @@ export function sortData(data: any[], orderBy: string | string[]): any[] {
 
   return [...data].sort((a, b) => {
     for (const spec of sortSpecs) {
-      // Convert field to JSONPath format if not already
-      const jsonPath = spec.field.startsWith('$.') ? spec.field : `$.${spec.field}`;
+      // Use field as-is (must be valid JSONPath)
+      const jsonPath = spec.field;
       const valA = resolveJsonPath(jsonPath, a);
       const valB = resolveJsonPath(jsonPath, b);
 

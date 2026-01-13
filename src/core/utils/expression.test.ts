@@ -97,7 +97,7 @@ describe('Expression Evaluator - Arrays and Lambdas', () => {
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('Item 2');
     expect(result[1].name).toBe('Item 3');
-    
+
     expect(evaluateExpression('items.filter(x => x.category == "A").length', context)).toBe(2);
     expect(evaluateExpression('numbers.filter(n => n > 3)', context)).toEqual([4, 5]);
   });
@@ -164,7 +164,7 @@ describe('Expression Evaluator - Context Variables ($)', () => {
       rootData: { name: 'Test' },
       index: 5,
     };
-    
+
     expect(evaluateExpression('$index', context)).toBe(5);
     expect(evaluateExpression('$rowNum', context)).toBe(6);
     expect(evaluateExpression('$index + 1', context)).toBe(6);
@@ -178,7 +178,7 @@ describe('Expression Evaluator - Context Variables ($)', () => {
       pageNum: 3,
       totalPages: 10,
     };
-    
+
     expect(evaluateExpression('$pageNum', context)).toBe(3);
     expect(evaluateExpression('$totalPages', context)).toBe(10);
     expect(evaluateExpression('"Page " + $pageNum + " of " + $totalPages', context)).toBe("Page 3 of 10");
@@ -198,7 +198,7 @@ describe('Expression Evaluator - Context Variables ($)', () => {
         { amount: 500 },
       ],
     };
-    
+
     expect(evaluateExpression('$groupKey', context)).toBe('Category A');
     expect(evaluateExpression('$groupCount', context)).toBe(5);
     expect(evaluateExpression('"Group: " + $groupKey + " (" + $groupCount + " items)"', context)).toBe("Group: Category A (5 items)");
@@ -214,7 +214,7 @@ describe('Expression Evaluator - Context Variables ($)', () => {
         { amount: 300, qty: 5 },
       ],
     };
-    
+
     expect(evaluateExpression('$sum_amount', context)).toBe(600);
     expect(evaluateExpression('$avg_amount', context)).toBe(200);
     expect(evaluateExpression('$min_amount', context)).toBe(100);
@@ -227,13 +227,13 @@ describe('Expression Evaluator - Context Variables ($)', () => {
       data: {},
       rootData: {},
     };
-    
+
     // These should return valid date strings (actual values depend on current time)
     const nowUtc = evaluateExpression('$nowUtc', context);
     const nowLocal = evaluateExpression('$nowLocal', context);
     const timeZoneId = evaluateExpression('$timeZoneId', context);
     const utcOffset = evaluateExpression('$utcOffsetMinutes', context);
-    
+
     expect(typeof nowUtc).toBe('string');
     expect(nowUtc).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO format
     expect(typeof nowLocal).toBe('string');
@@ -411,10 +411,10 @@ describe('Expression Evaluator - context() Function', () => {
 
     // Access nested properties
     expect(evaluateExpression("context('$.localization.greeting')", context)).toBe('Hello');
-    
+
     // Wildcard on context features
     expect(evaluateExpression("context('$.features[*].name')", context)).toEqual(['feature1', 'feature2', 'feature3']);
-    
+
     // Filter enabled features
     const enabledFeatures = evaluateExpression("context('$.features[?(@.enabled == true)]')", context);
     expect(enabledFeatures).toHaveLength(2);
@@ -495,7 +495,7 @@ describe('Expression Evaluator - Localization', () => {
         localization: {
           localeCode: 'en-US',
           resources: {
-            'en-US': { 
+            'en-US': {
               'welcome': 'Welcome User',
               'greeting': 'Hello',
               'farewell': 'Goodbye',
@@ -599,6 +599,13 @@ describe('resolveJsonPath - Basic Operations', () => {
     ],
   };
 
+  test('Identity path ($ and $.)', () => {
+    expect(resolveJsonPath('$', data)).toEqual(data);
+    expect(resolveJsonPath('$.', data)).toEqual(data);
+    expect(resolveJsonPath('$', 'primitive')).toBe('primitive');
+    expect(resolveJsonPath('$.', 123)).toBe(123);
+  });
+
   test('Root property access', () => {
     expect(resolveJsonPath('$.store', data)).toEqual(data.store);
   });
@@ -628,7 +635,7 @@ describe('resolveJsonPath - Basic Operations', () => {
   test('Filter expressions [?()]', () => {
     const expensiveBooks = resolveJsonPath('$.store.books[?(@.price > 12)]', data);
     expect(expensiveBooks).toHaveLength(2);
-    
+
     const author1Books = resolveJsonPath('$.store.books[?(@.author == "Author 1")]', data);
     expect(author1Books).toHaveLength(2);
   });

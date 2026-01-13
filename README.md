@@ -65,8 +65,9 @@ Free & Open Source Web Reporting Tool with visual designer, data binding, and mu
 - **Page Header/Footer** - Appears on every page in PDF export
 - **Subsections** - Nested data groups with their own bindings
 - **Grouping** - Group data by field with group headers/footers
-- **Data Sorting** - Sort section data by multiple fields: `orderBy: "name ASC, age DESC"`
-    - Supports nested paths: `orderBy: "user.lastName ASC"`
+- **Data Sorting** - Sort section data by multiple fields: `orderBy: "$.name ASC, $.age DESC"`
+    - Supports nested paths: `orderBy: "$.user.lastName ASC"`
+    - Sort arrays of primitives: `orderBy: "$. ASC"`
 
 ### Styling
 - Colors, backgrounds, borders

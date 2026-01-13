@@ -421,6 +421,7 @@ export default class ReportSection {
     if (layout.height) this.properties.height = layout.height;
     if (layout.binding) this.properties.binding = layout.binding;
     if (layout.groupBy) this.properties.groupBy = layout.groupBy;
+    if (layout.orderBy) this.properties.orderBy = Array.isArray(layout.orderBy) ? layout.orderBy.join(', ') : layout.orderBy;
 
     layout.items?.forEach((data) => {
       if (!data.type || data.type === "text") {
@@ -463,6 +464,7 @@ export default class ReportSection {
       height: this.properties.height,
       binding: this.properties.binding,
       groupBy: this.properties.groupBy || undefined,
+      orderBy: this.properties.orderBy || undefined,
       keepTogether: this.properties.keepTogether || undefined,
       visibleOnFirstPage: this.properties.visibleOnFirstPage,
       visibleOnLastPage: this.properties.visibleOnLastPage,

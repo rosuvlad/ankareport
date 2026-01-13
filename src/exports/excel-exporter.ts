@@ -10,11 +10,14 @@ import { pxToPt } from "../core/utils/units";
 Chart.register(...registerables);
 
 export async function exportToXlsx(layout: ILayout, data: any) {
-  let items = generateItems(layout, data, { rootData: data });
+  const initialPage = layout.initialPageNumber ?? 1;
+  const genContext = { rootData: data, pageNum: initialPage, totalPages: 1 };
+
+  let items = generateItems(layout, data, genContext);
 
   // Handle Page Header (Visible on First Page)
   if (layout.pageHeaderSection && layout.pageHeaderSection.visibleOnFirstPage) {
-    const headerItems = generatePageSectionItems(layout.pageHeaderSection, data, 0, { data, rootData: data });
+    const headerItems = generatePageSectionItems(layout.pageHeaderSection, data, 0, { data, rootData: data, pageNum: initialPage, totalPages: 1 });
 
     // Calculate header height
     let headerHeight = 0;
@@ -41,7 +44,7 @@ export async function exportToXlsx(layout: ILayout, data: any) {
     // Add padding
     contentBottom += 10;
 
-    const footerItems = generatePageSectionItems(layout.pageFooterSection, data, 0, { data, rootData: data });
+    const footerItems = generatePageSectionItems(layout.pageFooterSection, data, 0, { data, rootData: data, pageNum: initialPage, totalPages: 1 });
 
     // Shift footer items to bottom
     footerItems.forEach(item => item.y += contentBottom);

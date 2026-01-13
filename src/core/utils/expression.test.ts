@@ -74,3 +74,37 @@ describe('Expression Evaluator (jexpr refactor)', () => {
     expect(evaluateExpression('revenue > 4000 ? "High" : "Low"', context)).toBe("High");
   });
 });
+
+import { resolveSimplePath } from './expression';
+
+describe('resolveSimplePath (for sorting and bindings)', () => {
+  const data = {
+    user: {
+      name: 'John',
+      tags: [
+        { id: 1, label: 'tag1' },
+        { id: 2, label: 'tag2' }
+      ]
+    },
+    scores: [10, 20, 30]
+  };
+
+  test('Simple nested access', () => {
+    expect(resolveSimplePath('user.name', data)).toBe('John');
+  });
+
+  test('Array index access', () => {
+    expect(resolveSimplePath('user.tags[0].label', data)).toBe('tag1');
+    expect(resolveSimplePath('scores[1]', data)).toBe(20);
+  });
+
+  test('Array plucking syntax [*]', () => {
+    expect(resolveSimplePath('user.tags[*].id', data)).toEqual([1, 2]);
+    expect(resolveSimplePath('user.tags[*].label', data)).toEqual(['tag1', 'tag2']);
+  });
+
+  test('Returns null for invalid paths', () => {
+    expect(resolveSimplePath('user.nonexistent', data)).toBeUndefined();
+    expect(resolveSimplePath('nonexistent.path', data)).toBeNull();
+  });
+});

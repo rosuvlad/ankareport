@@ -10,6 +10,7 @@ import {
 import StyleProperties from "../core/styleProperties";
 import { evaluateExpression, evaluateCondition, ExpressionContext } from "../core/utils/expression";
 import { formatDate, formatNumber } from "../core/utils/format";
+import { sortData } from "../core/utils/generate";
 
 export interface SectionOptions {
   rootData?: any;
@@ -74,8 +75,8 @@ export default class Section {
     this.element.classList.add("anka-section");
 
     this.element.style.position = "relative";
-    
-    
+
+
     // Handle auto height - will be calculated after items are added
     if (this.layout.height !== "auto") {
       this.element.style.height = this.layout.height + "px";
@@ -141,7 +142,7 @@ export default class Section {
       } else if (layout.type === "chart") {
         const item = new ChartReportItem({ parentStyles: defaultStylesList });
         const chartLayout = { ...layout } as IChartReportItem;
-        
+
         // Resolve labels binding
         if (layout.labelsBinding) {
           const labels = this.evaluateBinding(layout.labelsBinding);
@@ -149,7 +150,7 @@ export default class Section {
             chartLayout.labels = labels.map(l => String(l));
           }
         }
-        
+
         // Resolve datasets binding
         if (layout.datasetsBinding) {
           const datasets = this.evaluateBinding(layout.datasetsBinding);
@@ -157,7 +158,7 @@ export default class Section {
             chartLayout.datasets = datasets;
           }
         }
-        
+
         item.loadLayout(chartLayout);
         this.applyConditionalStyles(item, layout.conditionalStyles);
         this.element.appendChild(item.element);
@@ -166,17 +167,22 @@ export default class Section {
     });
 
     this.layout.sections?.forEach((sectionLayout) => {
-      const subDataSource = this.data ? this.data[sectionLayout.binding] : {};
+      let subDataSource = this.data ? this.data[sectionLayout.binding] : {};
 
-      subDataSource?.forEach((sectionDataSource: any, idx: number) => {
-        const section = new Section(sectionLayout, sectionDataSource, [
-          ...this.defaultStyles,
-          this.layout,
-        ], idx, { rootData: this.options.rootData ?? this.data });
+      if (Array.isArray(subDataSource)) {
+        if (sectionLayout.orderBy) {
+          subDataSource = sortData(subDataSource, sectionLayout.orderBy);
+        }
+        subDataSource.forEach((sectionDataSource: any, idx: number) => {
+          const section = new Section(sectionLayout, sectionDataSource, [
+            ...this.defaultStyles,
+            this.layout,
+          ], idx, { rootData: this.options.rootData ?? this.data });
 
-        this.elementSections.appendChild(section.element);
-        this.elementSections.appendChild(section.elementSections);
-      });
+          this.elementSections.appendChild(section.element);
+          this.elementSections.appendChild(section.elementSections);
+        });
+      }
     });
 
     // Calculate auto height based on items
@@ -187,7 +193,7 @@ export default class Section {
 
   private calculateAutoHeight(): number {
     let maxBottom = 0;
-    
+
     // Calculate based on visible item positions only
     for (const item of this.reportItems) {
       // Check if item is actually rendered (visible in DOM)
@@ -198,7 +204,7 @@ export default class Section {
         }
       }
     }
-    
+
     // Add padding, minimum height of 20
     return Math.max(20, maxBottom + 10);
   }

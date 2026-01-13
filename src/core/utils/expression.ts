@@ -539,11 +539,11 @@ function resolvePath(path: string, context: ExpressionContext): any {
   return resolveSimplePath(path, data);
 }
 
-function resolveSimplePath(path: string, data: any): any {
+export function resolveSimplePath(path: string, data: any): any {
   if (!data || !path) return null;
 
-  const segments: (string | number)[] = [];
-  const regex = /([^.\[\]]+)|\[(\d+)\]/g;
+  const segments: (string | number | '*')[] = [];
+  const regex = /([^.\[\]]+)|\[(\d+)\]|\[\*\]/g;
   let match;
 
   while ((match = regex.exec(path)) !== null) {
@@ -552,12 +552,34 @@ function resolveSimplePath(path: string, data: any): any {
       segments.push(/^\d+$/.test(segment) ? parseInt(segment, 10) : segment);
     } else if (match[2] !== undefined) {
       segments.push(parseInt(match[2], 10));
+    } else if (match[0] === '[*]') {
+      segments.push('*');
     }
   }
 
   let result = data;
-  for (const segment of segments) {
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
     if (result == null) return null;
+
+    if (segment === '*') {
+      if (!Array.isArray(result)) return null;
+      // Pluck remaining segments from each item in the array
+      const remainingPath = segments.slice(i + 1);
+      return result.map(item => {
+        let subResult = item;
+        for (const subSegment of remainingPath) {
+          if (subResult == null) return null;
+          if (subSegment === '*') {
+            // Nested [*] not fully supported here for simplicity, but could be recursive
+            return subResult;
+          }
+          subResult = subResult[subSegment];
+        }
+        return subResult;
+      });
+    }
+
     result = result[segment];
   }
 

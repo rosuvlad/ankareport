@@ -5,6 +5,7 @@ import Section from "./section";
 import { exportToPdf } from "../export/export-to-pdf";
 import { resolvePageDimensions } from "../core/utils/pageSize";
 import { evaluateExpression } from "../core/utils/expression";
+import { sortData } from "../core/utils/generate";
 
 export interface RendererOptions {
   element: HTMLDivElement;
@@ -133,9 +134,12 @@ export default class Renderer {
     this.options.element.appendChild(this.headerSection.elementSections);
     // Render content sections
     const contentProperty = this.options.layout.contentSection.binding;
-    const contentData = contentProperty ? this.options.data[contentProperty] : null;
+    let contentData = contentProperty ? this.options.data[contentProperty] : null;
 
     if (Array.isArray(contentData)) {
+      if (this.options.layout.contentSection.orderBy) {
+        contentData = sortData(contentData, this.options.layout.contentSection.orderBy);
+      }
       contentData.forEach((data: any, index: number) => {
         const contentSection = new Section(
           this.options.layout.contentSection,

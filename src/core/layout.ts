@@ -20,6 +20,7 @@ export interface ISection extends IStyle {
   items?: IReportItem[];
   sections?: ISection[];
   groupBy?: string;
+  orderBy?: string | string[];
   groupHeader?: ISection;
   groupFooter?: ISection;
   keepTogether?: boolean;

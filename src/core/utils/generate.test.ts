@@ -464,6 +464,125 @@ describe("grouping and subtotals", () => {
     expect(textItems[0].text).toBe("2"); // Count of category A
     expect(textItems[1].text).toBe("1"); // Count of category B
   });
+
+  test("sorts content with orderBy", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "items",
+        orderBy: "score DESC, name ASC",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "name" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { score: 10, name: "B" },
+        { score: 20, name: "C" },
+        { score: 20, name: "A" },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems.length).toBe(3);
+    expect(textItems[0].text).toBe("A"); // score 20, name A
+    expect(textItems[1].text).toBe("C"); // score 20, name C
+    expect(textItems[2].text).toBe("B"); // score 10
+  });
+
+  test("sorts content with nested property orderBy", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "items",
+        orderBy: "user.name ASC",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "id" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { id: 1, user: { name: "Zoe" } },
+        { id: 2, user: { name: "Alice" } },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("2"); // Alice
+    expect(textItems[1].text).toBe("1"); // Zoe
+  });
+
+  test("sorts content with multi-level nested property orderBy", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "items",
+        orderBy: "user.profile.age DESC",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "id" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [
+        { id: 1, user: { profile: { age: 30 } } },
+        { id: 2, user: { profile: { age: 40 } } },
+        { id: 3, user: { profile: { age: 25 } } },
+      ],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("2"); // 40
+    expect(textItems[1].text).toBe("1"); // 30
+    expect(textItems[2].text).toBe("3"); // 25
+  });
+
+  test("sorts content with simple one-level field", () => {
+    const layout: ILayout = {
+      width: 500,
+      headerSection: { height: 0, binding: "", items: [] },
+      contentSection: {
+        height: 25,
+        binding: "items",
+        orderBy: "name DESC",
+        items: [
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "name" },
+        ],
+      },
+      footerSection: { height: 0, binding: "", items: [] },
+    };
+
+    const data = {
+      items: [{ name: "A" }, { name: "C" }, { name: "B" }],
+    };
+
+    const items = generateItems(layout, data);
+    const textItems = items.filter(x => x.type === "text");
+
+    expect(textItems[0].text).toBe("C");
+    expect(textItems[1].text).toBe("B");
+    expect(textItems[2].text).toBe("A");
+  });
 });
 
 function getLayout(): ILayout {

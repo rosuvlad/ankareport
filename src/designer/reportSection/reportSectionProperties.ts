@@ -9,6 +9,7 @@ export default class ReportSectionProperties extends StyleProperties {
   private _binding = "";
   private _title = "Section";
   private _groupBy = "";
+  private _orderBy = "";
   private _keepTogether = false;
   private _visibleOnFirstPage = false;
   private _visibleOnLastPage = false;
@@ -24,6 +25,9 @@ export default class ReportSectionProperties extends StyleProperties {
   }
   get groupBy() {
     return this._groupBy;
+  }
+  get orderBy() {
+    return this._orderBy;
   }
   get keepTogether() {
     return this._keepTogether;
@@ -59,6 +63,11 @@ export default class ReportSectionProperties extends StyleProperties {
     this._groupBy = value;
     this.emitOnChange("groupBy", value, oldValue);
   }
+  set orderBy(value: string) {
+    const oldValue = this.orderBy;
+    this._orderBy = value;
+    this.emitOnChange("orderBy", value, oldValue);
+  }
   set keepTogether(value: boolean) {
     const oldValue = this.keepTogether;
     this._keepTogether = value;
@@ -79,6 +88,7 @@ export default class ReportSectionProperties extends StyleProperties {
     return [
       { field: "height", label: "Height", type: "string" },
       { field: "groupBy", label: "Group By", type: "string" },
+      { field: "orderBy", label: "Order By", type: "string" },
       { field: "keepTogether", label: "Keep Together", type: "boolean" },
       { field: "visibleOnFirstPage", label: "Visible On First Page", type: "boolean" },
       { field: "visibleOnLastPage", label: "Visible On Last Page", type: "boolean" },

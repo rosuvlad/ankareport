@@ -1,5 +1,5 @@
 import { ILayout, IReportItem, ISection } from "../layout";
-import { evaluateExpression, evaluateCondition, ExpressionContext } from "./expression";
+import { evaluateExpression, evaluateCondition, ExpressionContext, resolveSimplePath } from "./expression";
 import { formatDate, formatNumber } from "./format";
 
 export interface GenerateContext {
@@ -42,8 +42,13 @@ export function generateItemsWithSections(layout: ILayout, data: any, genContext
 
   // Content section
   if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
-    const contentArray = data[layout.contentSection.binding];
+    let contentArray = data[layout.contentSection.binding];
     const keepTogether = layout.contentSection.keepTogether ?? false;
+
+    // Apply sorting
+    if (layout.contentSection.orderBy) {
+      contentArray = sortData(contentArray, layout.contentSection.orderBy);
+    }
 
     if (layout.contentSection.groupBy) {
       const groupedResult = processGroupedContentWithSections(topMargin, layout.contentSection, contentArray, { rootData, ...genContext });
@@ -181,7 +186,12 @@ export function generateItems(layout: ILayout, data: any, genContext?: GenerateC
   items.push(...headerElements.items);
 
   if (layout.contentSection.binding && data && Array.isArray(data[layout.contentSection.binding])) {
-    const contentArray = data[layout.contentSection.binding];
+    let contentArray = data[layout.contentSection.binding];
+
+    // Apply sorting
+    if (layout.contentSection.orderBy) {
+      contentArray = sortData(contentArray, layout.contentSection.orderBy);
+    }
 
     // Check if grouping is enabled
     if (layout.contentSection.groupBy) {
@@ -495,8 +505,12 @@ function getSectionItems(topMargin: number, section: ISection, data: any, index?
 
   if (section.sections) {
     for (const subSection of section.sections) {
-      const subData = subSection.binding && data ? data[subSection.binding] : null;
+      let subData = subSection.binding && data ? data[subSection.binding] : null;
       if (Array.isArray(subData)) {
+        // Apply sorting to subsection data
+        if (subSection.orderBy) {
+          subData = sortData(subData, subSection.orderBy);
+        }
         for (let i = 0; i < subData.length; i++) {
           const subItems = getSectionItems(topMargin + height, subSection, subData[i], i, sectionContext);
           height += subItems.height;
@@ -531,4 +545,42 @@ export function generatePageSectionItems(
   });
 
   return sectionItems.items;
+}
+
+/**
+ * Sort data by one or more properties (comma-separated or array)
+ * Supports direction: "field ASC" or "field DESC"
+ * Supports nested paths: "nested.field DESC"
+ */
+export function sortData(data: any[], orderBy: string | string[]): any[] {
+  if (!Array.isArray(data) || !orderBy) return data;
+
+  const fields = typeof orderBy === 'string'
+    ? orderBy.split(',').map(f => f.trim()).filter(f => f)
+    : orderBy;
+
+  if (fields.length === 0) return data;
+
+  const sortSpecs = fields.map(s => {
+    const parts = s.split(/\s+/);
+    const field = parts[0];
+    const direction = parts[1]?.toUpperCase() || 'ASC';
+    return {
+      field,
+      isDesc: direction === 'DESC'
+    };
+  });
+
+  return [...data].sort((a, b) => {
+    for (const spec of sortSpecs) {
+      const valA = resolveSimplePath(spec.field, a);
+      const valB = resolveSimplePath(spec.field, b);
+
+      if (valA === valB) continue;
+
+      if (valA < valB) return spec.isDesc ? 1 : -1;
+      if (valA > valB) return spec.isDesc ? -1 : 1;
+    }
+    return 0;
+  });
 }

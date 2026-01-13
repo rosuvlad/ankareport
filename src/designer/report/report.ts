@@ -228,6 +228,7 @@ export default class Report {
     if (layout.width) this.properties.width = layout.width;
     if (layout.height) this.properties.height = layout.height;
     if (layout.initialPageNumber !== undefined) this.properties.initialPageNumber = layout.initialPageNumber;
+    if (layout.supportedOutputs) this.properties.supportedOutputs = layout.supportedOutputs;
     this.properties.color = layout.color;
 
     // Load page header section (optional)
@@ -268,6 +269,7 @@ export default class Report {
       width,
       height,
       initialPageNumber: this.properties.initialPageNumber,
+      supportedOutputs: this.properties.supportedOutputs,
       color: this.properties.color,
       backgroundColor: this.properties.backgroundColor,
       textAlign: this.properties.textAlign,

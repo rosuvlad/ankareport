@@ -514,12 +514,38 @@ async function exportToPdf(layout: any, data: any): Promise<Buffer> {
  *                 description: Report data object
  *               layout:
  *                 type: object
- *                 description: AnkaReport layout object
+ *                 description: AnkaReport layout object. May include supportedOutputs property (PDF_AND_EXCEL, PDF, or EXCEL) to restrict output formats.
  *     responses:
  *       200:
  *         description: Report generated successfully
  *       400:
- *         description: Validation error
+ *         description: Validation error or unsupported output format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       enum: [VALIDATION_ERROR, UNSUPPORTED_OUTPUT_FORMAT]
+ *                     message:
+ *                       type: string
+ *             examples:
+ *               unsupportedPdf:
+ *                 summary: PDF not supported
+ *                 value:
+ *                   error:
+ *                     code: UNSUPPORTED_OUTPUT_FORMAT
+ *                     message: This report only supports Excel output. PDF export is not allowed.
+ *               unsupportedExcel:
+ *                 summary: Excel not supported
+ *                 value:
+ *                   error:
+ *                     code: UNSUPPORTED_OUTPUT_FORMAT
+ *                     message: This report only supports PDF output. Excel export is not allowed.
  *       500:
  *         description: Internal server error
  */
@@ -584,6 +610,27 @@ app.post('/api/v1/report-generator',
             message: 'Data must be an object, not an array',
           },
         });
+      }
+
+      // Validate supportedOutputs vs requested format (HTML is always allowed)
+      const supportedOutputs = layout.supportedOutputs || 'PDF_AND_EXCEL';
+      if (format !== 'html') {
+        if (supportedOutputs === 'PDF' && format === 'excel') {
+          return res.status(400).json({
+            error: {
+              code: 'UNSUPPORTED_OUTPUT_FORMAT',
+              message: 'This report only supports PDF output. Excel export is not allowed.',
+            },
+          });
+        }
+        if (supportedOutputs === 'EXCEL' && format === 'pdf') {
+          return res.status(400).json({
+            error: {
+              code: 'UNSUPPORTED_OUTPUT_FORMAT',
+              message: 'This report only supports Excel output. PDF export is not allowed.',
+            },
+          });
+        }
       }
 
       // Sanitize filename

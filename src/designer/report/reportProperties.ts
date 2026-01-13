@@ -1,6 +1,6 @@
 import { Property } from "../../components/propertyGrid/property";
 import StyleProperties from "../../core/styleProperties";
-import { PageSize } from "../../core/layout";
+import { PageSize, SupportedOutputs } from "../../core/layout";
 import { resolvePageDimensions, getAvailablePageSizes } from "../../core/utils/pageSize";
 import DropdownList from "../../components/propertyGrid/editors/dropdownList";
 
@@ -11,6 +11,7 @@ export default class ReportProperties extends StyleProperties {
   private _width: number | undefined;
   private _height: number | undefined;
   private _initialPageNumber: number | undefined = 1;
+  private _supportedOutputs: SupportedOutputs = "PDF_AND_EXCEL";
 
   get pageSize() {
     return this._pageSize;
@@ -26,6 +27,10 @@ export default class ReportProperties extends StyleProperties {
 
   get initialPageNumber(): number | undefined {
     return this._initialPageNumber;
+  }
+
+  get supportedOutputs(): SupportedOutputs {
+    return this._supportedOutputs;
   }
 
   set pageSize(value: PageSize | undefined) {
@@ -72,6 +77,12 @@ export default class ReportProperties extends StyleProperties {
     this.emitOnChange("initialPageNumber", this._initialPageNumber, oldValue);
   }
 
+  set supportedOutputs(value: SupportedOutputs) {
+    const oldValue = this._supportedOutputs;
+    this._supportedOutputs = value || "PDF_AND_EXCEL";
+    this.emitOnChange("supportedOutputs", this._supportedOutputs, oldValue);
+  }
+
   getPropertyDefinitions(): Property[] {
     const pageSizeItems = [
       { value: "", label: "(Custom)" },
@@ -81,6 +92,12 @@ export default class ReportProperties extends StyleProperties {
     const booleanItems = [
       { value: "false", label: "No" },
       { value: "true", label: "Yes" },
+    ];
+
+    const supportedOutputsItems = [
+      { value: "PDF_AND_EXCEL", label: "PDF and Excel" },
+      { value: "PDF", label: "PDF Only" },
+      { value: "EXCEL", label: "Excel Only" },
     ];
 
     return [
@@ -96,6 +113,15 @@ export default class ReportProperties extends StyleProperties {
       { field: "width", label: "Width", type: "string" },
       { field: "height", label: "Height", type: "string" },
       { field: "initialPageNumber", label: "Initial Page Number", type: "number" },
+      {
+        field: "supportedOutputs",
+        label: "Supported Outputs",
+        type: "string",
+        editor: new DropdownList({
+          items: supportedOutputsItems,
+          defaultValue: "PDF_AND_EXCEL",
+        }),
+      },
       ...super.getPropertyDefinitions(),
     ];
   }

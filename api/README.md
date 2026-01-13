@@ -71,15 +71,34 @@ Generate report in HTML, PDF, or Excel format.
 ```json
 {
   "data": { ... },
-  "layout": { ... },
+  "layout": {
+    "supportedOutputs": "PDF_AND_EXCEL",
+    ...
+  },
   "filename": "report"
 }
 ```
+
+**Layout `supportedOutputs` Property:**
+- `PDF_AND_EXCEL` (default): Both PDF and Excel exports are allowed
+- `PDF`: Only PDF export is allowed
+- `EXCEL`: Only Excel export is allowed
+- HTML format is always allowed regardless of this setting
 
 **Response:**
 - HTML: `text/html`
 - PDF: `application/pdf`
 - Excel: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+**Error Response (400):**
+```json
+{
+  "error": {
+    "code": "UNSUPPORTED_OUTPUT_FORMAT",
+    "message": "This report only supports PDF output. Excel export is not allowed."
+  }
+}
+```
 
 ### GET /health
 

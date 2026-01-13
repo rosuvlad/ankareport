@@ -2,6 +2,8 @@ import { TextAlign } from "./styleProperties";
 
 export type PageSize = "A2" | "A3" | "A4" | "A5" | "Letter" | "Legal" | "Tabloid";
 
+export type SupportedOutputs = "PDF_AND_EXCEL" | "PDF" | "EXCEL";
+
 export interface ILayout extends IStyle {
   pageSize?: PageSize;
   width?: number;
@@ -12,6 +14,7 @@ export interface ILayout extends IStyle {
   pageHeaderSection?: ISection;
   pageFooterSection?: ISection;
   initialPageNumber?: number; // Default: 1
+  supportedOutputs?: SupportedOutputs; // Default: PDF_AND_EXCEL
 }
 
 export interface ISection extends IStyle {

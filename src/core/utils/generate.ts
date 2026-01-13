@@ -1,5 +1,5 @@
 import { ILayout, IReportItem, ISection } from "../layout";
-import { evaluateExpression, evaluateCondition, ExpressionContext, resolveSimplePath } from "./expression";
+import { evaluateExpression, evaluateCondition, ExpressionContext, resolveJsonPath } from "./expression";
 import { formatDate, formatNumber } from "./format";
 
 export interface GenerateContext {
@@ -573,8 +573,10 @@ export function sortData(data: any[], orderBy: string | string[]): any[] {
 
   return [...data].sort((a, b) => {
     for (const spec of sortSpecs) {
-      const valA = resolveSimplePath(spec.field, a);
-      const valB = resolveSimplePath(spec.field, b);
+      // Convert field to JSONPath format if not already
+      const jsonPath = spec.field.startsWith('$.') ? spec.field : `$.${spec.field}`;
+      const valA = resolveJsonPath(jsonPath, a);
+      const valB = resolveJsonPath(jsonPath, b);
 
       if (valA === valB) continue;
 

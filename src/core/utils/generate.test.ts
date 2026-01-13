@@ -37,7 +37,7 @@ describe("getItems", () => {
     expect(client2).toEqual({
       type: "text",
       name: "",
-      binding: "client",
+      binding: "$.client",
       text: "Client2",
       x: 25,
       y: 400,
@@ -71,7 +71,7 @@ describe("path-based binding", () => {
         height: 50,
         binding: "",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "invoices[0].client" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.invoices[0].client" },
         ],
       },
       contentSection: { height: 0, binding: "", items: [] },
@@ -95,7 +95,7 @@ describe("path-based binding", () => {
         height: 50,
         binding: "",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "data.items[1].details.value" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.data.items[1].details.value" },
         ],
       },
       contentSection: { height: 0, binding: "", items: [] },
@@ -125,7 +125,7 @@ describe("$index binding", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 50,
-        binding: "items",
+        binding: "$.items",
         items: [
           { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$index" },
         ],
@@ -152,12 +152,12 @@ describe("$index binding", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 50,
-        binding: "orders",
+        binding: "$.orders",
         items: [],
         sections: [
           {
             height: 30,
-            binding: "lines",
+            binding: "$.lines",
             items: [
               { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$index" },
             ],
@@ -188,9 +188,9 @@ describe("$index binding", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 50,
-        binding: "items",
+        binding: "$.items",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "values[$index]" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.values[$index]" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -220,9 +220,9 @@ describe("header/footer section binding", () => {
       width: 500,
       headerSection: {
         height: 50,
-        binding: "header",
+        binding: "$.header",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "title" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.title" },
         ],
       },
       contentSection: { height: 0, binding: "", items: [] },
@@ -247,9 +247,9 @@ describe("header/footer section binding", () => {
       contentSection: { height: 0, binding: "", items: [] },
       footerSection: {
         height: 50,
-        binding: "footer",
+        binding: "$.footer",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "summary" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.summary" },
         ],
       },
     };
@@ -270,9 +270,9 @@ describe("header/footer section binding", () => {
       width: 500,
       headerSection: {
         height: 50,
-        binding: "invoices[0]",
+        binding: "$.invoices[0]",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "client" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.client" },
         ],
       },
       contentSection: { height: 0, binding: "", items: [] },
@@ -294,9 +294,9 @@ describe("header/footer section binding", () => {
       width: 500,
       headerSection: {
         height: 50,
-        binding: "nonexistent",
+        binding: "$.nonexistent",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "title" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.title" },
         ],
       },
       contentSection: { height: 0, binding: "", items: [] },
@@ -321,10 +321,10 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         groupBy: "category",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "name" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -354,7 +354,7 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         groupBy: "category",
         groupHeader: {
           height: 30,
@@ -364,7 +364,7 @@ describe("grouping and subtotals", () => {
           ],
         },
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "name" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -396,7 +396,7 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         groupBy: "category",
         groupFooter: {
           height: 30,
@@ -406,7 +406,7 @@ describe("grouping and subtotals", () => {
           ],
         },
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "name" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -435,7 +435,7 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         groupBy: "category",
         groupHeader: {
           height: 30,
@@ -471,10 +471,10 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         orderBy: "score DESC, name ASC",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "name" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -503,10 +503,10 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         orderBy: "user.name ASC",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "id" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.id" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -532,10 +532,10 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         orderBy: "user.profile.age DESC",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "id" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.id" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -563,10 +563,10 @@ describe("grouping and subtotals", () => {
       headerSection: { height: 0, binding: "", items: [] },
       contentSection: {
         height: 25,
-        binding: "items",
+        binding: "$.items",
         orderBy: "name DESC",
         items: [
-          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "name" },
+          { type: "text", x: 0, y: 0, width: 100, height: 20, name: "", text: "", binding: "$.name" },
         ],
       },
       footerSection: { height: 0, binding: "", items: [] },
@@ -592,24 +592,24 @@ function getLayout(): ILayout {
       height: 50,
       binding: "",
       items: [
-        { type: "text", x: 0, y: 0, width: 20, height: 10, name: "", text: "Header1", binding: "title" },
+        { type: "text", x: 0, y: 0, width: 20, height: 10, name: "", text: "Header1", binding: "$.title" },
         { type: "text", x: 20, y: 20, width: 40, height: 10, name: "", text: "Header2" },
       ],
     },
     contentSection: {
       height: 100,
-      binding: "invoices",
+      binding: "$.invoices",
       items: [
-        { type: "text", x: 25, y: 25, width: 20, height: 10, name: "", text: "", binding: "ficheNo" },
-        { type: "text", x: 25, y: 50, width: 80, height: 10, name: "", text: "", binding: "client" },
+        { type: "text", x: 25, y: 25, width: 20, height: 10, name: "", text: "", binding: "$.ficheNo" },
+        { type: "text", x: 25, y: 50, width: 80, height: 10, name: "", text: "", binding: "$.client" },
       ],
       sections: [
         {
           height: 100,
-          binding: "lines",
+          binding: "$.lines",
           items: [
-            { type: "text", x: 25, y: 25, width: 20, height: 10, name: "", text: "", binding: "stock" },
-            { type: "text", x: 25, y: 50, width: 80, height: 10, name: "", text: "", binding: "description" },
+            { type: "text", x: 25, y: 25, width: 20, height: 10, name: "", text: "", binding: "$.stock" },
+            { type: "text", x: 25, y: 50, width: 80, height: 10, name: "", text: "", binding: "$.description" },
           ],
           sections: [
           ],

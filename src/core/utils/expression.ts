@@ -1,3 +1,5 @@
+import * as jp from 'jsonpath';
+
 export interface ExpressionContext {
   data: any;
   rootData?: any;
@@ -13,34 +15,8 @@ export interface ExpressionContext {
 export function evaluateExpression(expression: string, context: ExpressionContext): any {
   if (!expression) return null;
 
-  // Preprocess: replace $index and $rowNum in the expression
-  let preprocessed = expression;
-  if (context.index !== undefined) {
-    preprocessed = preprocessed.replace(/\$index/g, String(context.index));
-    preprocessed = preprocessed.replace(/\$rowNum/g, String(context.index + 1));
-  }
-
-  // Preprocess: replace temporal context variables (only if expression contains them)
-  if (preprocessed.includes('$now') || preprocessed.includes('$timeZone') || preprocessed.includes('$utcOffset')) {
-    const temporal = context.rootData?.context?.temporal ?? context.data?.context?.temporal;
-    if (temporal) {
-      preprocessed = preprocessed.replace(/\$nowUtc/g, `"${temporal.nowUtc ?? ''}"`);
-      preprocessed = preprocessed.replace(/\$timeZoneId/g, `"${temporal.timeZoneId ?? ''}"`);
-      preprocessed = preprocessed.replace(/\$nowLocal/g, `"${temporal.nowLocal ?? ''}"`);
-      preprocessed = preprocessed.replace(/\$utcOffsetMinutes/g, String(temporal.utcOffsetMinutes ?? 0));
-    } else {
-      // Auto-fill from JavaScript Date if context.temporal is missing
-      const now = new Date();
-      const utcOffsetMinutes = -now.getTimezoneOffset();
-      preprocessed = preprocessed.replace(/\$nowUtc/g, `"${now.toISOString()}"`);
-      preprocessed = preprocessed.replace(/\$timeZoneId/g, `"${Intl.DateTimeFormat().resolvedOptions().timeZone}"`);
-      preprocessed = preprocessed.replace(/\$nowLocal/g, `"${now.toISOString().slice(0, -1)}${utcOffsetMinutes >= 0 ? '+' : '-'}${String(Math.abs(Math.floor(utcOffsetMinutes / 60))).padStart(2, '0')}:${String(Math.abs(utcOffsetMinutes % 60)).padStart(2, '0')}"`);
-      preprocessed = preprocessed.replace(/\$utcOffsetMinutes/g, String(utcOffsetMinutes));
-    }
-  }
-
   // Handle pipes/filters first - split by | but not inside quotes or brackets
-  const { expr, filters } = parseFilters(preprocessed);
+  const { expr, filters } = parseFilters(expression);
 
   let result = evaluateCore(expr.trim(), context);
 
@@ -51,7 +27,6 @@ export function evaluateExpression(expression: string, context: ExpressionContex
 
   return result;
 }
-
 
 // Import jexpr from local vendored path
 // @ts-ignore
@@ -111,22 +86,49 @@ function createEvaluationScope(context: ExpressionContext): any {
   // But SUM(items.price) -> jexpr evaluates items.price -> passing array to SUM.
   // So SUM function just needs to handle array argument.
 
+  // Get temporal context for $now* variables
+  const temporal = rootData?.context?.temporal ?? data?.context?.temporal;
+  const now = new Date();
+  const utcOffsetMinutes = -now.getTimezoneOffset();
+
   const helpers = {
+    // Aggregate functions
     sum: (arg: any) => aggregate('SUM', arg),
     avg: (arg: any) => aggregate('AVG', arg),
     count: (arg: any) => aggregate('COUNT', arg),
     min: (arg: any) => aggregate('MIN', arg),
     max: (arg: any) => aggregate('MAX', arg),
+    
+    // Utility functions
     localize: (key: any, defaultText?: any, locale?: any, resources?: any) =>
       evaluateLocalizeFn(key, defaultText, locale, resources, context),
     convertTz: (dt: any, to: any, from?: any) => evaluateConvertTzFn(dt, to, from),
-    // Add context vars
-    $index: context.index,
-    $rowNum: context.rowNum,
+    
+    // JSONPath function: var('$.path.to.data') - evaluates JSONPath against current data context
+    // Example: var('$.context.localization.localeCode')
+    var: (path: string) => {
+      if (!path) return null;
+      // Try current data first, then rootData
+      let result = resolveJsonPath(path, data);
+      if (result === null && rootData !== data) {
+        result = resolveJsonPath(path, rootData);
+      }
+      return result;
+    },
+    
+    // Context variables ($ prefix)
+    $index: context.index ?? 0,
+    $rowNum: (context.index ?? 0) + 1,
     $groupKey: context.groupKey,
-    $groupCount: context.groupCount,
-    $pageNum: context.pageNum,
-    $totalPages: context.totalPages,
+    $groupCount: context.groupCount ?? 0,
+    $pageNum: context.pageNum ?? 1,
+    $totalPages: context.totalPages ?? 1,
+    
+    // Temporal variables
+    $nowUtc: temporal?.nowUtc ?? now.toISOString(),
+    $nowLocal: temporal?.nowLocal ?? `${now.toISOString().slice(0, -1)}${utcOffsetMinutes >= 0 ? '+' : '-'}${String(Math.abs(Math.floor(utcOffsetMinutes / 60))).padStart(2, '0')}:${String(Math.abs(utcOffsetMinutes % 60)).padStart(2, '0')}`,
+    $timeZoneId: temporal?.timeZoneId ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+    $utcOffsetMinutes: temporal?.utcOffsetMinutes ?? utcOffsetMinutes,
   };
 
   // Merge order: Helpers > Data > RootData?
@@ -217,7 +219,9 @@ function evaluateSpecialVariable(expr: string, context: ExpressionContext): any 
 
 function calculateGroupAggregate(type: string, field: string, data: any[]): number {
   const values = data.map(item => {
-    const val = resolveSimplePath(field, item);
+    // Convert simple field to JSONPath if not already
+    const jsonPath = field.startsWith('$.') ? field : `$.${field}`;
+    const val = resolveJsonPath(jsonPath, item);
     return typeof val === 'number' ? val : parseFloat(val) || 0;
   });
 
@@ -243,13 +247,13 @@ function evaluateLocalizeFn(key: any, defaultText: any, locale: any, resources: 
   // Resolve locale
   let localeCode = locale ? String(locale) : undefined;
   if (!localeCode) {
-    localeCode = resolveSimplePath('context.localization.localeCode', context.rootData ?? context.data);
+    localeCode = resolveJsonPath('$.context.localization.localeCode', context.rootData ?? context.data);
   }
 
   // Resolve resources
   let res: Record<string, Record<string, string>> | undefined = resources;
   if (!res) {
-    res = resolveSimplePath('context.localization.resources', context.rootData ?? context.data);
+    res = resolveJsonPath('$.context.localization.resources', context.rootData ?? context.data);
   }
 
   if (res && localeCode && res[localeCode] && res[localeCode][k]) {
@@ -523,67 +527,44 @@ function resolvePath(path: string, context: ExpressionContext): any {
 
   if (!path) return null;
 
-  // First try to resolve from the current data context
-  const firstSegment = path.split(/[.\[]/)[0];
-
-  // Prefer data if the property exists there
-  if (data && data[firstSegment] !== undefined) {
-    return resolveSimplePath(path, data);
+  // All paths should now be JSONPath format starting with $.
+  // First try to resolve from the current data context, then rootData
+  let result = resolveJsonPath(path, data);
+  if (result === null && rootData !== data) {
+    result = resolveJsonPath(path, rootData);
   }
-
-  // Fall back to rootData for root-level data source references
-  if (rootData && rootData[firstSegment] !== undefined) {
-    return resolveSimplePath(path, rootData);
-  }
-
-  return resolveSimplePath(path, data);
+  return result;
 }
 
-export function resolveSimplePath(path: string, data: any): any {
+/**
+ * Resolve a JSONPath expression against data.
+ * All paths must start with $. (e.g., $.store.book[0].title)
+ * 
+ * Supported JSONPath syntax:
+ * - $.property - root property access
+ * - $.store.book - nested property access  
+ * - $.store.book[0] - array index access
+ * - $.store.book[*].author - wildcard array access
+ * - $.store..price - recursive descent
+ * - $.store.book[?(@.price < 10)] - filter expressions
+ * - $.store.book[(@.length-1)] - script expressions
+ */
+export function resolveJsonPath(path: string, data: any): any {
   if (!data || !path) return null;
-
-  const segments: (string | number | '*')[] = [];
-  const regex = /([^.\[\]]+)|\[(\d+)\]|\[\*\]/g;
-  let match;
-
-  while ((match = regex.exec(path)) !== null) {
-    if (match[1] !== undefined) {
-      const segment = match[1];
-      segments.push(/^\d+$/.test(segment) ? parseInt(segment, 10) : segment);
-    } else if (match[2] !== undefined) {
-      segments.push(parseInt(match[2], 10));
-    } else if (match[0] === '[*]') {
-      segments.push('*');
+  
+  try {
+    const result = jp.query(data, path);
+    // jp.query always returns an array, unwrap single values
+    if (Array.isArray(result)) {
+      if (result.length === 0) return null;
+      if (result.length === 1) return result[0];
+      return result;
     }
+    return result;
+  } catch (e) {
+    console.warn(`[JSONPath] Error resolving path "${path}":`, e);
+    return null;
   }
-
-  let result = data;
-  for (let i = 0; i < segments.length; i++) {
-    const segment = segments[i];
-    if (result == null) return null;
-
-    if (segment === '*') {
-      if (!Array.isArray(result)) return null;
-      // Pluck remaining segments from each item in the array
-      const remainingPath = segments.slice(i + 1);
-      return result.map(item => {
-        let subResult = item;
-        for (const subSegment of remainingPath) {
-          if (subResult == null) return null;
-          if (subSegment === '*') {
-            // Nested [*] not fully supported here for simplicity, but could be recursive
-            return subResult;
-          }
-          subResult = subResult[subSegment];
-        }
-        return subResult;
-      });
-    }
-
-    result = result[segment];
-  }
-
-  return result;
 }
 
 export function evaluateCondition(condition: string, context: ExpressionContext): boolean {

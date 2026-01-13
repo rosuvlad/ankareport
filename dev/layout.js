@@ -17,7 +17,7 @@ var layout = {
         "fontWeight": "bold",
         "type": "text",
         "text": "",
-        "binding": "company.name",
+        "binding": "$.company.name",
         "format": ""
       },
       {
@@ -102,7 +102,7 @@ var layout = {
         "fontSize": "16px",
         "type": "text",
         "text": "",
-        "binding": "reportYear",
+        "binding": "$.reportYear",
         "format": ""
       },
       {
@@ -127,7 +127,7 @@ var layout = {
         "fontSize": "11px",
         "type": "text",
         "text": "",
-        "binding": "generatedDate",
+        "binding": "$.generatedDate",
         "format": "MMMM dd, yyyy"
       },
       {
@@ -138,7 +138,7 @@ var layout = {
         "name": "",
         "type": "qrcode",
         "value": "",
-        "binding": "reportUrl",
+        "binding": "$.reportUrl",
         "errorCorrectionLevel": "M"
       },
       {
@@ -177,7 +177,7 @@ var layout = {
         "fontWeight": "bold",
         "type": "text",
         "text": "",
-        "binding": "summary.totalRevenue",
+        "binding": "$.summary.totalRevenue",
         "format": "$#,##0"
       },
       {
@@ -203,7 +203,7 @@ var layout = {
         "fontWeight": "bold",
         "type": "text",
         "text": "",
-        "binding": "summary.totalExpenses",
+        "binding": "$.summary.totalExpenses",
         "format": "$#,##0"
       },
       {
@@ -229,7 +229,7 @@ var layout = {
         "fontWeight": "bold",
         "type": "text",
         "text": "",
-        "binding": "summary.netProfit",
+        "binding": "$.summary.netProfit",
         "format": "$#,##0"
       },
       {
@@ -269,7 +269,7 @@ var layout = {
         ],
         "type": "text",
         "text": "",
-        "binding": "summary.growthRate + '%'",
+        "binding": "$.summary.growthRate + '%'",
         "format": ""
       },
       {
@@ -293,7 +293,7 @@ var layout = {
         "fontSize": "11px",
         "type": "text",
         "text": "",
-        "binding": "summary.employeeCount",
+        "binding": "$.summary.employeeCount",
         "format": ""
       },
       {
@@ -305,9 +305,9 @@ var layout = {
         "type": "chart",
         "chartType": "line",
         "labels": [],
-        "labelsBinding": "charts.monthlyLabels",
+        "labelsBinding": "$.charts.monthlyLabels",
         "datasets": [],
-        "datasetsBinding": "[{label: 'Revenue', data: charts.revenueData, borderColor: '#4CAF50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true}, {label: 'Expenses', data: charts.expensesData, borderColor: '#F44336', backgroundColor: 'rgba(244,67,54,0.1)', fill: true}]",
+        "datasetsBinding": "[{label: 'Revenue', data: $.charts.revenueData, borderColor: '#4CAF50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true}, {label: 'Expenses', data: $.charts.expensesData, borderColor: '#F44336', backgroundColor: 'rgba(244,67,54,0.1)', fill: true}]",
         "titleBinding": "localize('monthly_performance')",
         "showLegend": true,
         "legendPosition": "bottom",
@@ -330,9 +330,9 @@ var layout = {
         "type": "chart",
         "chartType": "pie",
         "labels": [],
-        "labelsBinding": "charts.departmentLabels",
+        "labelsBinding": "$.charts.departmentLabels",
         "datasets": [],
-        "datasetsBinding": "[{data: charts.departmentRevenue, backgroundColor: charts.departmentColors}]",
+        "datasetsBinding": "[{data: $.charts.departmentRevenue, backgroundColor: $.charts.departmentColors}]",
         "titleBinding": "localize('revenue_by_dept')",
         "showLegend": true,
         "legendPosition": "right"
@@ -355,7 +355,7 @@ var layout = {
   },
   "contentSection": {
     "height": "auto",
-    "binding": "departments",
+    "binding": "$.departments",
     "keepTogether": true,
     "visibleOnFirstPage": false,
     "visibleOnLastPage": false,
@@ -383,7 +383,7 @@ var layout = {
         "fontWeight": "bold",
         "type": "text",
         "text": "",
-        "binding": "name",
+        "binding": "$.name",
         "format": ""
       },
       {
@@ -408,7 +408,7 @@ var layout = {
         "fontSize": "10px",
         "type": "text",
         "text": "",
-        "binding": "manager",
+        "binding": "$.manager",
         "format": ""
       },
       {
@@ -419,7 +419,7 @@ var layout = {
         "name": "",
         "type": "barcode",
         "value": "",
-        "binding": "code",
+        "binding": "$.code",
         "format": "CODE128",
         "barWidth": 1.5,
         "displayValue": false
@@ -446,7 +446,7 @@ var layout = {
         "fontSize": "10px",
         "type": "text",
         "text": "",
-        "binding": "revenue",
+        "binding": "$.revenue",
         "format": "$#,##0"
       },
       {
@@ -471,7 +471,7 @@ var layout = {
         "fontSize": "10px",
         "type": "text",
         "text": "",
-        "binding": "expenses",
+        "binding": "$.expenses",
         "format": "$#,##0"
       },
       {
@@ -510,7 +510,7 @@ var layout = {
         ],
         "type": "text",
         "text": "",
-        "binding": "profit",
+        "binding": "$.profit",
         "format": "$#,##0"
       },
       {
@@ -534,7 +534,7 @@ var layout = {
         "fontSize": "10px",
         "type": "text",
         "text": "",
-        "binding": "employeeCount",
+        "binding": "$.employeeCount",
         "format": ""
       },
       {
@@ -564,14 +564,14 @@ var layout = {
         ],
         "type": "text",
         "text": "",
-        "binding": "status",
+        "binding": "$.status",
         "format": ""
       }
     ],
     "sections": [
       {
         "height": "auto",
-        "binding": "projects",
+        "binding": "$.projects",
         "visibleOnFirstPage": false,
         "visibleOnLastPage": false,
         "items": [
@@ -596,7 +596,7 @@ var layout = {
             "fontSize": "10px",
             "type": "text",
             "text": "",
-            "binding": "name",
+            "binding": "$.name",
             "format": ""
           },
           {
@@ -621,7 +621,7 @@ var layout = {
             "fontSize": "9px",
             "type": "text",
             "text": "",
-            "binding": "budget",
+            "binding": "$.budget",
             "format": "$#,##0"
           },
           {
@@ -657,7 +657,7 @@ var layout = {
             ],
             "type": "text",
             "text": "",
-            "binding": "spent",
+            "binding": "$.spent",
             "format": "$#,##0"
           },
           {
@@ -669,7 +669,7 @@ var layout = {
             "fontSize": "9px",
             "type": "text",
             "text": "",
-            "binding": "completion + '%'",
+            "binding": "$.completion + '%'",
             "format": ""
           },
           {
@@ -691,7 +691,7 @@ var layout = {
             ],
             "type": "text",
             "text": "",
-            "binding": "status",
+            "binding": "$.status",
             "format": ""
           }
         ],
@@ -727,9 +727,9 @@ var layout = {
         "type": "chart",
         "chartType": "bar",
         "labels": [],
-        "labelsBinding": "topPerformers.map(p => p.name)",
+        "labelsBinding": "$.topPerformers.map(p => p.name)",
         "datasets": [],
-        "datasetsBinding": "[{label: 'Bonus ($)', data: topPerformers.map(p => p.bonus), backgroundColor: ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336']}]",
+        "datasetsBinding": "[{label: 'Bonus ($)', data: $.topPerformers.map(p => p.bonus), backgroundColor: ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336']}]",
         "title": "Performance Bonuses",
         "showLegend": false,
         "legendPosition": "top",
@@ -747,7 +747,7 @@ var layout = {
     "sections": [
       {
         "height": "auto",
-        "binding": "topPerformers",
+        "binding": "$.topPerformers",
         "visibleOnFirstPage": false,
         "visibleOnLastPage": false,
         "items": [
@@ -761,7 +761,7 @@ var layout = {
             "fontWeight": "bold",
             "type": "text",
             "text": "",
-            "binding": "$rowNum + '. ' + name",
+            "binding": "$rowNum + '. ' + $.name",
             "format": ""
           },
           {
@@ -774,7 +774,7 @@ var layout = {
             "fontSize": "10px",
             "type": "text",
             "text": "",
-            "binding": "department",
+            "binding": "$.department",
             "format": ""
           },
           {
@@ -786,7 +786,7 @@ var layout = {
             "fontSize": "10px",
             "type": "text",
             "text": "",
-            "binding": "achievement",
+            "binding": "$.achievement",
             "format": ""
           }
         ],
@@ -811,7 +811,7 @@ var layout = {
         "fontSize": "9px",
         "type": "text",
         "text": "",
-        "binding": "footerText",
+        "binding": "$.footerText",
         "format": ""
       }
     ],

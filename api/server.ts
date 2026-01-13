@@ -50,8 +50,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      frameSrc: ["'self'", "blob:"],
+      connectSrc: ["'self'"],
     },
   },
 }));
@@ -264,6 +267,79 @@ function getIndexHtmlTemplate(): string {
     indexHtmlTemplate = readFileSync(templatePath, 'utf-8');
   }
   return indexHtmlTemplate!;
+}
+
+// Cache for standalone assets
+let standaloneJs: string | null = null;
+let standaloneCss: string | null = null;
+
+function getStandaloneAssets() {
+  if (!standaloneJs) {
+    const jsPath = join(__dirname, 'public/libs/ankareport.js');
+    standaloneJs = readFileSync(jsPath, 'utf-8');
+  }
+  if (!standaloneCss) {
+    const cssPath = join(__dirname, 'public/libs/ankareport.css');
+    standaloneCss = readFileSync(cssPath, 'utf-8');
+  }
+  return { js: standaloneJs, css: standaloneCss };
+}
+
+/**
+ * Generates a fully standalone HTML document with all dependencies inlined.
+ */
+function generateStandaloneHtml(layout: any, data: any): string {
+  const { js, css } = getStandaloneAssets();
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AnkaReport - Standalone</title>
+  <style>
+    ${css}
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: auto; /* Changed to auto for standalone viewing */
+    }
+    #report-container {
+      margin: 20px auto; /* Centered with some margin */
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div id="report-container"></div>
+  <script>
+    // Inline report data
+    window.__ANKAREPORT_LAYOUT__ = ${JSON.stringify(layout)};
+    window.__ANKAREPORT_DATA__ = ${JSON.stringify(data)};
+
+    // Inline library
+    ${js}
+  </script>
+  <script>
+    (async function() {
+      try {
+        const container = document.getElementById('report-container');
+        if (!container) return;
+
+        const layout = window.__ANKAREPORT_LAYOUT__;
+        const data = window.__ANKAREPORT_DATA__;
+
+        AnkaReport.render({
+          element: container,
+          layout: layout,
+          data: data
+        });
+      } catch (error) {
+        console.error('Standalone render error:', error);
+      }
+    })();
+  </script>
+</body>
+</html>`;
 }
 
 // HTML Export Handler
@@ -517,7 +593,7 @@ app.post('/api/v1/report-generator',
 
       // Generate report based on format
       if (format === 'html') {
-        const html = await exportToHtml(layout, data);
+        const html = generateStandaloneHtml(layout, data);
         res.setHeader('Content-Type', 'text/html');
         res.setHeader('Content-Disposition', `inline; filename="${safeFilename}.html"`);
         res.send(html);

@@ -135,6 +135,11 @@ app.get('/', (req: Request, res: Response) => {
   res.redirect('/swagger');
 });
 
+// Playground UI
+app.get('/playground', (req: Request, res: Response) => {
+  res.sendFile(join(__dirname, 'public/playground.html'));
+});
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({

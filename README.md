@@ -737,6 +737,19 @@ Health check endpoint.
 }
 ```
 
+### API Playground
+
+A built-in interactive playground is available at `/playground` for testing layouts and data without external tools.
+
+**URL:** `http://localhost:3000/playground`
+
+**Features:**
+- **Enterprise UI:** Professional, clean interface for report configuration.
+- **Multipart Upload:** Select `layout.json` and `data.json` files directly from your disk.
+- **Real-time Preview:** Instantly view HTML reports in a split-screen preview.
+- **Standalone HTML:** Generated HTML reports are **100% self-contained** (inlined JS/CSS) and work offline.
+- **Download Support:** Easily generate and download PDF and Excel reports with correct filenames.
+
 #### GET /swagger
 
 Interactive API documentation with Swagger UI.

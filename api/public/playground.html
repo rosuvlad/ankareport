@@ -296,7 +296,10 @@
 
                 log('SUCCESS: Response received.', 'info');
 
+                // Get the blob with the correct type from the response
                 const blob = await response.blob();
+
+                // Create object URL
                 const url = URL.createObjectURL(blob);
 
                 if (format === 'html') {
@@ -310,13 +313,27 @@
                 } else {
                     const a = document.createElement('a');
                     a.href = url;
+
+                    // Force the correct extension based on format
                     const ext = format === 'excel' ? 'xlsx' : 'pdf';
-                    const finalFilename = filename.toLowerCase().endsWith(`.${ext}`) ? filename : `${filename}.${ext}`;
-                    a.download = finalFilename;
+
+                    // Ensure filename is clean and has extension
+                    let downloadName = filename.trim();
+                    if (!downloadName) downloadName = 'report';
+
+                    if (!downloadName.toLowerCase().endsWith(`.${ext}`)) {
+                        downloadName = `${downloadName}.${ext}`;
+                    }
+
+                    a.setAttribute('download', downloadName);
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    log(`SUCCESS: ${format.toUpperCase()} download initiated: ${finalFilename}`, 'info');
+
+                    // Clean up
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+
+                    log(`SUCCESS: ${format.toUpperCase()} download initiated: ${downloadName}`, 'info');
                 }
             } catch (err) {
                 log(`CRITICAL: ${err.message}`, 'error');

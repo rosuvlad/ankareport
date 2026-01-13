@@ -1,68 +1,83 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <link rel="stylesheet" href="/assets/ankareport.css">
-  </head>
-  <body>
-    <div id="report-container"></div>
-    <script src="/assets/ankareport.js"></script>
-    <script>
-      (async function() {
-        try {
-          const container = document.getElementById('report-container');
-          if (!container) {
-            window.renderError = 'Container not found';
-            return;
-          }
-          
-          // Check if data is provided inline or via GUID
-          let layout, data;
-          
-          if (window.__ANKAREPORT_DATA_GUID__) {
-            // Fetch data via GUID (for large payloads) from internal server
-            const internalServerUrl = window.__ANKAREPORT_INTERNAL_SERVER_URL__ || '';
-            const guid = window.__ANKAREPORT_DATA_GUID__;
-            
-            try {
-              const [layoutResponse, dataResponse] = await Promise.all([
-                fetch(`${internalServerUrl}/layout/${guid}`),
-                fetch(`${internalServerUrl}/data/${guid}`)
-              ]);
-              
-              if (!layoutResponse.ok || !dataResponse.ok) {
-                window.renderError = 'Failed to load report data';
-                return;
-              }
-              
-              layout = await layoutResponse.json();
-              data = await dataResponse.json();
-            } catch (fetchError) {
-              window.renderError = `Failed to fetch report data: ${fetchError.message}`;
+
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/ankareport.css">
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    #report-container {
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="report-container"></div>
+  <script src="/assets/ankareport.js"></script>
+  <script>
+    (async function () {
+      try {
+        const container = document.getElementById('report-container');
+        if (!container) {
+          window.renderError = 'Container not found';
+          return;
+        }
+
+        // Check if data is provided inline or via GUID
+        let layout, data;
+
+        if (window.__ANKAREPORT_DATA_GUID__) {
+          // Fetch data via GUID (for large payloads) from internal server
+          const internalServerUrl = window.__ANKAREPORT_INTERNAL_SERVER_URL__ || '';
+          const guid = window.__ANKAREPORT_DATA_GUID__;
+
+          try {
+            const [layoutResponse, dataResponse] = await Promise.all([
+              fetch(`${internalServerUrl}/layout/${guid}`),
+              fetch(`${internalServerUrl}/data/${guid}`)
+            ]);
+
+            if (!layoutResponse.ok || !dataResponse.ok) {
+              window.renderError = 'Failed to load report data';
               return;
             }
-          } else {
-            // Use inline data (for small payloads)
-            layout = window.__ANKAREPORT_LAYOUT__;
-            data = window.__ANKAREPORT_DATA__;
-          }
-          
-          if (!layout || !data) {
-            window.renderError = 'Layout or data not provided';
+
+            layout = await layoutResponse.json();
+            data = await dataResponse.json();
+          } catch (fetchError) {
+            window.renderError = `Failed to fetch report data: ${fetchError.message}`;
             return;
           }
-          
-          const renderer = AnkaReport.render({
-            element: container,
-            layout: layout,
-            data: data
-          });
-          window.rendererReady = true;
-        } catch (error) {
-          console.error('Render error:', error);
-          window.renderError = error.message || 'Unknown error';
+        } else {
+          // Use inline data (for small payloads)
+          layout = window.__ANKAREPORT_LAYOUT__;
+          data = window.__ANKAREPORT_DATA__;
         }
-      })();
-    </script>
-  </body>
+
+        if (!layout || !data) {
+          window.renderError = 'Layout or data not provided';
+          return;
+        }
+
+        const renderer = AnkaReport.render({
+          element: container,
+          layout: layout,
+          data: data
+        });
+        window.rendererReady = true;
+      } catch (error) {
+        console.error('Render error:', error);
+        window.renderError = error.message || 'Unknown error';
+      }
+    })();
+  </script>
+</body>
+
 </html>

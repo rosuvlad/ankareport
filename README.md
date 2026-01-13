@@ -657,10 +657,11 @@ npm run api:start
 
 #### POST /api/v1/report-generator
 
-Generate report in HTML, PDF, or Excel format.
+Generate report in HTML, PDF, or Excel format. Supports both `application/json` and `multipart/form-data`.
 
 **Query Parameters:**
 - `format` (required): `html`, `pdf`, or `excel`
+- `filename` (optional): Output filename (sanitized automatically)
 
 **Request Body:**
 ```json
@@ -685,10 +686,13 @@ Generate report in HTML, PDF, or Excel format.
         { "type": "text", "x": 200, "y": 60, "width": 100, "height": 20, "binding": "revenue", "format": "f2" }
       ]
     }
-  },
-  "filename": "report"
+  }
 }
 ```
+
+**Multipart Form Data (Recommended for large files):**
+- `data`: Report data (JSON file)
+- `layout`: AnkaReport layout (JSON file)
 
 **Response:**
 - HTML: `Content-Type: text/html`
@@ -697,23 +701,23 @@ Generate report in HTML, PDF, or Excel format.
 
 **Example using cURL:**
 ```bash
-# Generate PDF
-curl -X POST "http://localhost:3000/api/v1/report-generator?format=pdf" \
+# Generate PDF (JSON request)
+curl -X POST "http://localhost:3000/api/v1/report-generator?format=pdf&filename=report" \
   -H "Content-Type: application/json" \
-  -d '{"data": {...}, "layout": {...}, "filename": "report"}' \
+  -d '{"data": {...}, "layout": {...}}' \
   --output report.pdf
 
-# Generate Excel
-curl -X POST "http://localhost:3000/api/v1/report-generator?format=excel" \
-  -H "Content-Type: application/json" \
-  -d '{"data": {...}, "layout": {...}, "filename": "report"}' \
-  --output report.xlsx
+# Generate PDF (Multipart request - Recommended)
+curl -X POST "http://localhost:3000/api/v1/report-generator?format=pdf&filename=report" \
+  -F "data=@data.json" \
+  -F "layout=@layout.json" \
+  --output report.pdf
 
-# Generate HTML
-curl -X POST "http://localhost:3000/api/v1/report-generator?format=html" \
-  -H "Content-Type: application/json" \
-  -d '{"data": {...}, "layout": {...}, "filename": "report"}' \
-  --output report.html
+# Generate Excel (Multipart request)
+curl -X POST "http://localhost:3000/api/v1/report-generator?format=excel&filename=report" \
+  -F "data=@data.json" \
+  -F "layout=@layout.json" \
+  --output report.xlsx
 ```
 
 #### GET /health
@@ -776,33 +780,153 @@ CLEANUP_INTERVAL_MS=1800000
 
 ### Docker Deployment
 
+The API includes a multi-stage Dockerfile and docker-compose.yml for production deployments.
+
 #### Build Docker Image
 
 ```bash
+# Build the image
 docker build -t ankareport-api .
+
+# Build with a specific tag
+docker build -t ankareport-api:1.0.0 .
+
+# Build with no cache (for fresh builds)
+docker build --no-cache -t ankareport-api .
 ```
+
+The Dockerfile uses a multi-stage build:
+1. **Stage 1 (builder)** - Builds the AnkaReport library
+2. **Stage 2 (api-builder)** - Builds the API server
+3. **Stage 3 (runtime)** - Uses Playwright's Docker image for PDF/Excel rendering
 
 #### Run Container
 
 ```bash
+# Basic run
 docker run -p 3000:3000 ankareport-api
+
+# Run in background
+docker run -d -p 3000:3000 --name ankareport ankareport-api
+
+# Run with custom environment variables
+docker run -d -p 3000:3000 \
+  -e MAX_REQUEST_SIZE=100mb \
+  -e REQUEST_TIMEOUT_MS=180000 \
+  -e MAX_CONCURRENT_PAGES=20 \
+  --name ankareport ankareport-api
+
+# Run with memory limits
+docker run -d -p 3000:3000 \
+  --memory=4g --memory-reservation=2g \
+  --name ankareport ankareport-api
 ```
 
-#### Docker Compose
+#### Docker Compose (Recommended)
+
+The included `docker-compose.yml` provides production-ready defaults:
 
 ```bash
-# Start service
-docker-compose up
+# Build and start the service
+docker-compose up --build
 
-# Start in background
+# Start in background (detached mode)
 docker-compose up -d
+
+# Start with rebuild (after code changes)
+docker-compose up -d --build
 
 # View logs
 docker-compose logs -f
 
+# View logs for last 100 lines
+docker-compose logs -f --tail=100
+
 # Stop service
 docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
+
+# Restart service
+docker-compose restart
 ```
+
+##### Customizing docker-compose.yml
+
+The default `docker-compose.yml` includes:
+
+```yaml
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - MAX_REQUEST_SIZE=50mb
+      - REQUEST_TIMEOUT_MS=120000
+      - RATE_LIMIT_MAX=100
+      - RATE_LIMIT_WINDOW_MS=900000
+      - MAX_CONCURRENT_PAGES=10
+      - NODE_OPTIONS=--max-old-space-size=4096
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+```
+
+To customize, create a `docker-compose.override.yml`:
+
+```yaml
+# docker-compose.override.yml
+services:
+  api:
+    ports:
+      - "8080:3000"  # Use port 8080 externally
+    environment:
+      - MAX_REQUEST_SIZE=100mb
+      - MAX_CONCURRENT_PAGES=20
+```
+
+##### Health Monitoring
+
+The container includes a health check that monitors the `/health` endpoint:
+
+```bash
+# Check container health status
+docker-compose ps
+
+# View health check logs
+docker inspect --format='{{json .State.Health}}' ankareport-api-1
+```
+
+##### Production Deployment Tips
+
+1. **Resource Allocation**: Ensure adequate memory (4GB+ recommended) for Playwright browser rendering
+2. **Restart Policy**: The `restart: unless-stopped` policy ensures automatic recovery after crashes
+3. **Health Checks**: Monitor the `/health` endpoint for service availability
+4. **Logging**: Configure log rotation for production:
+   ```yaml
+   logging:
+     driver: "json-file"
+     options:
+       max-size: "10m"
+       max-file: "3"
+   ```
+5. **Scaling**: For high-load scenarios, use a load balancer with multiple containers
 
 ### Architecture
 

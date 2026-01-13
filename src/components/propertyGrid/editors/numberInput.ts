@@ -1,6 +1,6 @@
 import { EventCallback } from "../../../core/eventEmitter";
 import { PropertyEditor, PropertyEditorEventsMap } from "../property";
-import "./NumberInput.css";
+import "./numberInput.css";
 
 export interface ChangeEventArgs {
   value: number;

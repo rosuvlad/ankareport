@@ -17,7 +17,7 @@ const INTERNAL_PORT_START = 30000;
 async function findAvailablePort(startPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
-    
+
     server.on('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
         findAvailablePort(startPort + 1).then(resolve).catch(reject);
@@ -25,7 +25,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
         reject(err);
       }
     });
-    
+
     server.listen(startPort, '127.0.0.1', () => {
       const port = (server.address() as any)?.port || startPort;
       server.close(() => {
@@ -39,13 +39,21 @@ async function findAvailablePort(startPort: number): Promise<number> {
  * Start internal server on localhost only
  * Returns the port number the server is listening on
  */
-export async function startInternalServer(): Promise<number> {
+export async function startInternalServer(assetsPath?: string): Promise<number> {
   if (internalServer) {
     return internalPort; // Already started
   }
 
   const app = express();
-  
+
+  if (assetsPath) {
+    // assetsPath should be the path to the 'public' directory
+    app.use(express.static(assetsPath));
+    // Serve library assets at /assets to match index.html expected paths
+    const { join } = await import('path');
+    app.use('/assets', express.static(join(assetsPath, 'libs')));
+  }
+
   // Endpoint for layout (streaming)
   app.get('/layout/:guid', (req: Request, res: Response) => {
     try {
@@ -102,14 +110,14 @@ export async function startInternalServer(): Promise<number> {
 
   // Find available port
   const port = await findAvailablePort(INTERNAL_PORT_START);
-  
+
   // Start server
   internalServer = app.listen(port, '127.0.0.1', () => {
     // Server is listening
   });
-  
+
   internalPort = port;
-  
+
   return internalPort;
 }
 

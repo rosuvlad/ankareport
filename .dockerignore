@@ -6,7 +6,6 @@ README.md
 .env
 .env.local
 .env.*.local
-dist
 coverage
 .vscode
 .idea
@@ -16,13 +15,13 @@ coverage
 .DS_Store
 .cursor
 dev
-src
 *.test.ts
 *.test.js
 jest.config.js
 babel.config.js
-rollup.config.js
-tsconfig.json
 .eslintrc*
 .prettierrc*
 *.plan.md
+dist
+api/dist
+api/node_modules
